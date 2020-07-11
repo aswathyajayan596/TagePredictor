@@ -37,6 +37,34 @@ typedef Bit#(GEOMLENGTH_bits)     GEOMETRIC;                    //geomlength of 
 typedef Bit#(TARGETLENGTH_bits)   TARGETLENGTH;                 //targetlength
 typedef Bit#(`PHR_LEN)            PHR;
 
+// typedef struct {
+//     int tagSize;
+//     Bit#(tagSize) tag;
+//     Bit#(CTR_bits) ctr;
+//     Bit#(U_bits) ubit;
+// } TagEntry deriving(Bits, Eq, FShow);
+
+// typedef union tagged {
+//   bit [4:0] Register;
+//   bit [21:0] Literal;
+//   struct {
+//   bit [4:0] regAddr;
+//   bit [4:0] regIndex;
+//   } Indexed;
+// } InstrOperand;
+typedef union tagged{
+      Bit#(`TAG1_SIZE) Tag1;
+      Bit#(`TAG2_SIZE) Tag2;
+    } Tag deriving(Bits, Eq, FShow);
+
+typedef struct {
+    Bit#(CTR_bits) ctr;
+    Bit#(U_bits) ubit;
+    Tag tag; 
+} TagEntry deriving(Bits, Eq, FShow);
+
+
+
 typedef struct {
     CTR ctr;
     TAG1 tag;
@@ -58,8 +86,8 @@ typedef struct {
 typedef struct {
     BIMODALINDEX                                  bimodalindex;
     Vector#(`NUMTAGTABLES, INDEX)                 index;
-    Vector#(TSub#(`NUMTAGTABLES,2), TAG1)     	  comp_tag1_table;
-    Vector#(TSub#(`NUMTAGTABLES,2), TAG2)     	  comp_tag2_table;
+    Vector#(TSub#(`NUMTAGTABLES,2), Tag)     	  comp_tag1_table;
+    Vector#(TSub#(`NUMTAGTABLES,2), Tag)     	  comp_tag2_table;
     Vector#(`NUMTAGTABLES, Usefulbits)  		      usefulbits;
     Vector#(TAdd#(`NUMTAGTABLES,1), CTR)          ctr;
     GHR             		                          ghr;
@@ -72,8 +100,8 @@ typedef struct {
 typedef struct {
     BIMODALINDEX	     		                        bimodalindex;
     Vector#(`NUMTAGTABLES, INDEX)                 index;
-    Vector#(TSub#(`NUMTAGTABLES,2), TAG1)         comp_tag1_table;
-    Vector#(TSub#(`NUMTAGTABLES,2), TAG2)         comp_tag2_table;
+    Vector#(TSub#(`NUMTAGTABLES,2), Tag)         comp_tag1_table;
+    Vector#(TSub#(`NUMTAGTABLES,2), Tag)         comp_tag2_table;
     Vector#(`NUMTAGTABLES, Usefulbits) 			      usefulbits;
     Vector#(TAdd#(`NUMTAGTABLES,1), CTR)          ctr;
     PRED            		                          pred;

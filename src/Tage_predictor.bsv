@@ -22,16 +22,19 @@ module mkTage_predictor(Tage_predictor_IFC);
 	Reg#(GHR) ghr <- mkReg(0);									//internal register to store GHR
 	Reg#(Prediction_Packet) pred_pkt <- mkReg(unpack(0));  //output - index, tag1 & 2, usefulbits,ctr, ghr,prediction, tableNo, altpred initialised to 0
 	RegFile#(BIMODALINDEX, Bimodal_Entry) bimodal <- mkRegFile(0, bimodal_max);
-	RegFile#(INDEX, Tag_Entry1) table_0 <- mkRegFile(0, table_max);
-	RegFile#(INDEX, Tag_Entry1) table_1 <- mkRegFile(0, table_max);
-	RegFile#(INDEX, Tag_Entry2) table_2 <- mkRegFile(0, table_max);
-	RegFile#(INDEX, Tag_Entry2) table_3 <- mkRegFile(0, table_max);
+	RegFile#(INDEX, TagEntry) table_0 <- mkRegFile(0, table_max);
+	RegFile#(INDEX, TagEntry) table_1 <- mkRegFile(0, table_max);
+	RegFile#(INDEX, TagEntry) table_2 <- mkRegFile(0, table_max);
+	RegFile#(INDEX, TagEntry) table_3 <- mkRegFile(0, table_max);
 	Reg#(PHR) phr <- mkReg(0);
 
 	RWire#(Updation_Packet) rw_upd_pkt <- mkRWire();
 	RWire#(Bit#(1))	rw_pred <- mkRWire();
 	RWire#(Bit#(1)) upd_pkt_recvd <- mkRWire();
 	Wire#(PC) w_pc <- mkWire();
+
+	
+
 
 	rule rl_update_GHR;
 		let t_ghr = ghr;
@@ -77,11 +80,12 @@ module mkTage_predictor(Tage_predictor_IFC);
 
 
 	method Action computePrediction(PC pc);
-
-		TAG1 comp_tag10_table = 0;
-	  TAG1 comp_tag11_table = 0; 	//tag1
-		TAG2 comp_tag20_table = 0;
-	  TAG2 comp_tag21_table = 0;	//tag2
+		// Tag comp_tag10_table, comp_tag11_table, comp_tag20_table, comp_tag21_table;
+		Tag comp_tag[4];
+		// Tag comp_tag10_table 0;
+	 //  	Tag comp_tag11_table 0; 	//tag1
+		// Tag comp_tag20_table 0;
+	 //  	Tag comp_tag21_table 0;	//tag2
 		BIMODALINDEX index0;
 		INDEX index1;
 		INDEX index2;
@@ -99,6 +103,7 @@ module mkTage_predictor(Tage_predictor_IFC);
 
 		//$display("Calculating Index..... ");
 
+
 	 	index0 = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b000));
 	 	t_pred_pkt.bimodalindex = index0;
 
@@ -111,38 +116,38 @@ module mkTage_predictor(Tage_predictor_IFC);
 	 	index3 = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b011));
 		t_pred_pkt.index[2] = index3;
 
-	  index4 = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b100));
-	  t_pred_pkt.index[3] = index4;
+	  	index4 = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b100));
+	  	t_pred_pkt.index[3] = index4;
 
 		//$display("Calculating TAG..... ");
 
-    comp_tag10_table = truncate(compFoldTag(pc,ghr,3'b001));  //tag of table1 is computed
-	  comp_tag11_table = truncate(compFoldTag(pc,ghr,3'b010));   //tag of table2 is computed
+    	comp_tag[0] = tagged Tag1 truncate(compFoldTag(pc,ghr,3'b001));  //tag of table1 is computed
+	  	comp_tag[1] = tagged Tag1 truncate(compFoldTag(pc,ghr,3'b010));   //tag of table2 is computed
 
-		t_pred_pkt.comp_tag1_table[0] = comp_tag10_table;
-		t_pred_pkt.comp_tag1_table[1] = comp_tag11_table;
+		t_pred_pkt.comp_tag1_table[0] = comp_tag[0];
+		t_pred_pkt.comp_tag1_table[1] = comp_tag[1];
 
-		comp_tag20_table = truncate(compFoldTag(pc,ghr,3'b011));   //tag of table3 is computed
-		comp_tag21_table = truncate(compFoldTag(pc,ghr,3'b100));   //tag of table4 is computed
+		comp_tag[2] = tagged Tag2 truncate(compFoldTag(pc,ghr,3'b011));   //tag of table3 is computed
+		comp_tag[3] = tagged Tag2 truncate(compFoldTag(pc,ghr,3'b100));   //tag of table4 is computed
 
-		t_pred_pkt.comp_tag2_table[0] = comp_tag20_table;
-		t_pred_pkt.comp_tag2_table[1] = comp_tag21_table;
+		t_pred_pkt.comp_tag2_table[0] = comp_tag[2];
+		t_pred_pkt.comp_tag2_table[1] = comp_tag[3];
 
 
 
-		if (table_3.sub(index4).tag == t_pred_pkt.comp_tag2_table[1]) begin      //comparing tag and computed tag T4
+		if (table_3.sub(index4).tag == comp_tag[3]) begin      //comparing tag and computed tag T4
 			t_pred_pkt.pred = table_3.sub(index4).ctr[2];   //ctr[2]
 			t_pred_pkt.ctr[4] = table_3.sub(index4).ctr;
 			t_pred_pkt.tableNo = 3'b100;
-			if(table_2.sub(index3).tag == t_pred_pkt.comp_tag2_table[0]) begin    // alternate table as lower history tables
+			if(table_2.sub(index3).tag == comp_tag[2]) begin    // alternate table as lower history tables
 				t_pred_pkt.altpred = table_2.sub(index3).ctr[2];
 				let alt_tableNo = 3'b011;
 			end
-			else if(table_1.sub(index2).tag == t_pred_pkt.comp_tag1_table[1]) begin
+			else if(table_1.sub(index2).tag == comp_tag[1]) begin
 				t_pred_pkt.altpred = table_1.sub(index2).ctr[2];
 				let alt_tableNo = 3'b010;
 			end
-			else if(table_0.sub(index1).tag == t_pred_pkt.comp_tag1_table[0]) begin
+			else if(table_0.sub(index1).tag == comp_tag[0]) begin
 				t_pred_pkt.altpred = table_0.sub(index1).ctr[2];
 				let alt_tableNo = 3'b001;
 			end
@@ -151,15 +156,15 @@ module mkTage_predictor(Tage_predictor_IFC);
 				let alt_tableNo = 3'b000;
 			end
 		end
-		else if(table_2.sub(index3).tag == t_pred_pkt.comp_tag2_table[0]) begin          //comparing tag and computed tag T3
+		else if(table_2.sub(index3).tag == comp_tag[2]) begin          //comparing tag and computed tag T3
 			t_pred_pkt.pred = table_2.sub(index3).ctr[2];
 			t_pred_pkt.ctr[3] = table_2.sub(index3).ctr;
 			t_pred_pkt.tableNo = 3'b011;
-			if(table_1.sub(index2).tag == t_pred_pkt.comp_tag1_table[1]) begin
+			if(table_1.sub(index2).tag == comp_tag[1]) begin
 				t_pred_pkt.altpred = table_1.sub(index2).ctr[2];
 				let alt_tableNo = 3'b010;
 			end
-			else if(table_0.sub(index1).tag == t_pred_pkt.comp_tag1_table[0]) begin
+			else if(table_0.sub(index1).tag == comp_tag[0]) begin
 				t_pred_pkt.altpred = table_0.sub(index1).ctr[2];
 				let alt_tableNo = 3'b001;                                                 // alternate table as lower history tables
 			end
@@ -169,11 +174,11 @@ module mkTage_predictor(Tage_predictor_IFC);
 				let alt_tableNo = 3'b000;
 			end
 		end
-		else if(table_1.sub(index2).tag == t_pred_pkt.comp_tag1_table[1]) begin          //comparing tag and computed tag T2
+		else if(table_1.sub(index2).tag == comp_tag[1]) begin          //comparing tag and computed tag T2
 			t_pred_pkt.pred = table_1.sub(index2).ctr[2];
 			t_pred_pkt.ctr[2] = table_1.sub(index2).ctr;
 			t_pred_pkt.tableNo = 3'b010;
-			if(table_0.sub(index1).tag == t_pred_pkt.comp_tag1_table[0]) begin
+			if(table_0.sub(index1).tag == comp_tag[0]) begin
 				t_pred_pkt.altpred = table_0.sub(index1).ctr[2];
 				let alt_tableNo = 3'b001;                                                   // alternate table as lower history tables
 			end
@@ -183,7 +188,7 @@ module mkTage_predictor(Tage_predictor_IFC);
 				let alt_tableNo = 3'b000;
 				end
 			end
-		else if(table_0.sub(index1).tag == comp_tag10_table) begin                          //comparing tag and computed tag T1
+		else if(table_0.sub(index1).tag == comp_tag[0]) begin                          //comparing tag and computed tag T1
 			t_pred_pkt.pred = table_0.sub(index1).ctr[2];
 			t_pred_pkt.tableNo = 3'b001;
 			t_pred_pkt.ctr[1] = table_0.sub(index1).ctr;
@@ -233,10 +238,10 @@ method Action updateTablePred(Updation_Packet upd_pkt);
 	ACTUAL_OUTCOME outcome = upd_pkt.actual_outcome;
 
 	Bimodal_Entry t_bimodal = bimodal.sub(ind0);
-	Tag_Entry1 		t_table_0 = table_0.sub(ind1);
-	Tag_Entry1 		t_table_1 = table_1.sub(ind2);
-	Tag_Entry2 		t_table_2 = table_2.sub(ind3);
-	Tag_Entry2 		t_table_3 = table_3.sub(ind4);
+	TagEntry 		t_table_0 = table_0.sub(ind1);
+	TagEntry 		t_table_1 = table_1.sub(ind2);
+	TagEntry 		t_table_2 = table_2.sub(ind3);
+	TagEntry 		t_table_3 = table_3.sub(ind4);
 
 	//$display("\n\nUpdation Packet\n",fshow(upd_pkt));
 	//$display("Updation Packet Table Number = %b",upd_pkt.tableNo);
