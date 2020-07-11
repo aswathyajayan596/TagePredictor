@@ -85,11 +85,8 @@ package Tage_predictor;
             //      Tag comp_tag11_table 0;     //tag1
             // Tag comp_tag20_table 0;
             //      Tag comp_tag21_table 0; //tag2
-            BIMODALINDEX index0;
-            INDEX index1;
-            INDEX index2;
-            INDEX index3;
-            INDEX index4;
+            BIMODALINDEX bimodal_index;
+            INDEX index[4];
             Prediction_Packet t_pred_pkt = unpack(0);
             t_pred_pkt.phr = phr;
             t_pred_pkt.phr = (t_pred_pkt.phr << 1);
@@ -103,99 +100,89 @@ package Tage_predictor;
             //$display("Calculating Index..... ");
 
 
-            index0 = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b000));
-            t_pred_pkt.bimodalindex = index0;
+            bimodal_index = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b000));
+            t_pred_pkt.bimodalindex = bimodal_index;
 
-            index1 = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b001));
-            t_pred_pkt.index[0] = index1;
+            for(Integer i = 0; i<=3; i=i+1) begin
+                Bit#(3) tNo = fromInteger(i+1);
+                index[i] = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,tNo));
+                t_pred_pkt.index[i] = index[i];
+                if(i<2) begin
+                    comp_tag[i] = tagged Tag2 truncate(compFoldTag(pc,ghr,tNo));
+                    t_pred_pkt.comp_tag1_table[0] = comp_tag[0];
+                    t_pred_pkt.comp_tag1_table[1] = comp_tag[1];
+                end
+                else begin
+                    comp_tag[i] = tagged Tag1 truncate(compFoldTag(pc,ghr,tNo));
+                    t_pred_pkt.comp_tag2_table[0] = comp_tag[2];
+                    t_pred_pkt.comp_tag2_table[1] = comp_tag[3];
+                end
+            end
 
-            index2 = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b010));
-            t_pred_pkt.index[1] = index2;
+            // for(Integer i = 0, j=0; i < 4)
 
-            index3 = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b011));
-            t_pred_pkt.index[2] = index3;
-
-            index4 = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b100));
-            t_pred_pkt.index[3] = index4;
-
-            //$display("Calculating TAG..... ");
-
-            comp_tag[0] = tagged Tag1 truncate(compFoldTag(pc,ghr,3'b001));  //tag of table1 is computed
-            comp_tag[1] = tagged Tag1 truncate(compFoldTag(pc,ghr,3'b010));   //tag of table2 is computed
-
-            t_pred_pkt.comp_tag1_table[0] = comp_tag[0];
-            t_pred_pkt.comp_tag1_table[1] = comp_tag[1];
-
-            comp_tag[2] = tagged Tag2 truncate(compFoldTag(pc,ghr,3'b011));   //tag of table3 is computed
-            comp_tag[3] = tagged Tag2 truncate(compFoldTag(pc,ghr,3'b100));   //tag of table4 is computed
-
-            t_pred_pkt.comp_tag2_table[0] = comp_tag[2];
-            t_pred_pkt.comp_tag2_table[1] = comp_tag[3];
-
-
-
-            if (table_3.sub(index4).tag == comp_tag[3]) begin      //comparing tag and computed tag T4
-                t_pred_pkt.pred = table_3.sub(index4).ctr[2];   //ctr[2]
-                t_pred_pkt.ctr[4] = table_3.sub(index4).ctr;
+            if(table_3.sub(index[3]).tag == comp_tag[3]) begin      //comparing tag and computed tag T4
+                t_pred_pkt.pred = table_3.sub(index[3]).ctr[2];   //ctr[2]
+                t_pred_pkt.ctr[4] = table_3.sub(index[3]).ctr;
                 t_pred_pkt.tableNo = 3'b100;
-                if(table_2.sub(index3).tag == comp_tag[2]) begin    // alternate table as lower history tables
-                    t_pred_pkt.altpred = table_2.sub(index3).ctr[2];
+                if(table_2.sub(index[2]).tag == comp_tag[2]) begin    // alternate table as lower history tables
+                    t_pred_pkt.altpred = table_2.sub(index[2]).ctr[2];
                     let alt_tableNo = 3'b011;
                 end
-                else if(table_1.sub(index2).tag == comp_tag[1]) begin
-                    t_pred_pkt.altpred = table_1.sub(index2).ctr[2];
+                else if(table_1.sub(index[1]).tag == comp_tag[1]) begin
+                    t_pred_pkt.altpred = table_1.sub(index[1]).ctr[2];
                     let alt_tableNo = 3'b010;
                 end
-                else if(table_0.sub(index1).tag == comp_tag[0]) begin
-                    t_pred_pkt.altpred = table_0.sub(index1).ctr[2];
+                else if(table_0.sub(index[0]).tag == comp_tag[0]) begin
+                    t_pred_pkt.altpred = table_0.sub(index[0]).ctr[2];
                     let alt_tableNo = 3'b001;
                 end
                 else begin
-                    t_pred_pkt.altpred = bimodal.sub(index0).ctr[1];
+                    t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
                     let alt_tableNo = 3'b000;
                 end
             end
-            else if(table_2.sub(index3).tag == comp_tag[2]) begin          //comparing tag and computed tag T3
-                t_pred_pkt.pred = table_2.sub(index3).ctr[2];
-                t_pred_pkt.ctr[3] = table_2.sub(index3).ctr;
+            else if(table_2.sub(index[2]).tag == comp_tag[2]) begin          //comparing tag and computed tag T3
+                t_pred_pkt.pred = table_2.sub(index[2]).ctr[2];
+                t_pred_pkt.ctr[3] = table_2.sub(index[2]).ctr;
                 t_pred_pkt.tableNo = 3'b011;
-                if(table_1.sub(index2).tag == comp_tag[1]) begin
-                    t_pred_pkt.altpred = table_1.sub(index2).ctr[2];
+                if(table_1.sub(index[1]).tag == comp_tag[1]) begin
+                    t_pred_pkt.altpred = table_1.sub(index[1]).ctr[2];
                     let alt_tableNo = 3'b010;
                 end
-                else if(table_0.sub(index1).tag == comp_tag[0]) begin
-                    t_pred_pkt.altpred = table_0.sub(index1).ctr[2];
+                else if(table_0.sub(index[0]).tag == comp_tag[0]) begin
+                    t_pred_pkt.altpred = table_0.sub(index[0]).ctr[2];
                     let alt_tableNo = 3'b001;                                                 // alternate table as lower history tables
                 end
             else begin
-                    t_pred_pkt.altpred = bimodal.sub(index0).ctr[1];
+                    t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
                     let alt_tableNo = 3'b000;
                 end
             end
-            else if(table_1.sub(index2).tag == comp_tag[1]) begin          //comparing tag and computed tag T2
-                t_pred_pkt.pred = table_1.sub(index2).ctr[2];
-                t_pred_pkt.ctr[2] = table_1.sub(index2).ctr;
+            else if(table_1.sub(index[1]).tag == comp_tag[1]) begin          //comparing tag and computed tag T2
+                t_pred_pkt.pred = table_1.sub(index[1]).ctr[2];
+                t_pred_pkt.ctr[2] = table_1.sub(index[1]).ctr;
                 t_pred_pkt.tableNo = 3'b010;
-                if(table_0.sub(index1).tag == comp_tag[0]) begin
-                    t_pred_pkt.altpred = table_0.sub(index1).ctr[2];
+                if(table_0.sub(index[0]).tag == comp_tag[0]) begin
+                    t_pred_pkt.altpred = table_0.sub(index[0]).ctr[2];
                     let alt_tableNo = 3'b001;                                                   // alternate table as lower history tables
                 end
             else begin
-                    t_pred_pkt.altpred = bimodal.sub(index0).ctr[1];
+                    t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
                     let alt_tableNo = 3'b000;
                 end
             end
-            else if(table_0.sub(index1).tag == comp_tag[0]) begin                          //comparing tag and computed tag T1
-                t_pred_pkt.pred = table_0.sub(index1).ctr[2];
+            else if(table_0.sub(index[0]).tag == comp_tag[0]) begin                          //comparing tag and computed tag T1
+                t_pred_pkt.pred = table_0.sub(index[0]).ctr[2];
                 t_pred_pkt.tableNo = 3'b001;
-                t_pred_pkt.ctr[1] = table_0.sub(index1).ctr;
-                t_pred_pkt.altpred = bimodal.sub(index0).ctr[1];
+                t_pred_pkt.ctr[1] = table_0.sub(index[0]).ctr;
+                t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
                 let alt_tableNo = 3'b000;                   // alternate table as lower history tables
             end
             else begin
-                t_pred_pkt.pred = bimodal.sub(index0).ctr[1];
-                t_pred_pkt.ctr[0] = zeroExtend(bimodal.sub(index0).ctr);
-                t_pred_pkt.altpred = bimodal.sub(index0).ctr[1];
+                t_pred_pkt.pred = bimodal.sub(bimodal_index).ctr[1];
+                t_pred_pkt.ctr[0] = zeroExtend(bimodal.sub(bimodal_index).ctr);
+                t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
                 t_pred_pkt.tableNo = 3'b000;
                 let alt_tableNo = 3'b000;
             end
