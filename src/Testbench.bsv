@@ -79,9 +79,9 @@ module mkTestbench(Empty);
 
   rule rl_display(ctr > 0);       //display rule for displaying the current cycle
 
-    //$display("Entered Display rule ");
-    //$display("\n\n======================================");
-    //$display("\nCycle %d   Ctr %d",cur_cycle, ctr);
+    $display("Entered Display rule ");
+    $display("\n\n======================================");
+    $display("\nCycle %d   Ctr %d",cur_cycle, ctr);
   
   endrule
 
@@ -130,11 +130,11 @@ module mkTestbench(Empty);
   rule end_simulation(ctr == `traceSize);
     $display("Result:%d,%d", correct, incorrect);
     // $display("Incorrect = %d      Correct = %d",incorrect,correct);
-    /*$display("\nBimodal Table \n", fshow(table_ctr[0]));
+    $display("\nBimodal Table \n", fshow(table_ctr[0]));
     $display("\nTable 1\n", fshow(table_ctr[1]));
     $display("\nTable 2 \n", fshow(table_ctr[2]));
     $display("\nTable 3 \n", fshow(table_ctr[3]));
-    $display("\nTable 4 \n", fshow(table_ctr[4]));*/
+    $display("\nTable 4 \n", fshow(table_ctr[4]));
     $finish(0);
   endrule
 

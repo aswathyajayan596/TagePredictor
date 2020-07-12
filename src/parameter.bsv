@@ -12,4 +12,4 @@
 `define TABLE_LEN 10
 `define PHR_LEN 32
 
-`define traceSize 3771697
+`define traceSize 3000
