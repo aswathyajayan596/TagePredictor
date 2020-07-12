@@ -28,6 +28,8 @@ package Tage_predictor;
         RegFile#(INDEX, TagEntry) table_3 <- mkRegFile(0, table_max);
         Reg#(PHR) phr <- mkReg(0);
 
+        RegFile#(INDEX, TagEntry) tables[4] = {table_0, table_1, table_2, table_3};
+
         RWire#(Updation_Packet) rw_upd_pkt <- mkRWire();
         RWire#(Bit#(1)) rw_pred <- mkRWire();
         RWire#(Bit#(1)) upd_pkt_recvd <- mkRWire();
@@ -119,73 +121,114 @@ package Tage_predictor;
                 end
             end
 
-            // for(Integer i = 0, j=0; i < 4)
+            //for(Integer i = 0, j=0; i < 4)
 
-            if(table_3.sub(index[3]).tag == comp_tag[3]) begin      //comparing tag and computed tag T4
-                t_pred_pkt.pred = table_3.sub(index[3]).ctr[2];   //ctr[2]
-                t_pred_pkt.ctr[4] = table_3.sub(index[3]).ctr;
-                t_pred_pkt.tableNo = 3'b100;
-                if(table_2.sub(index[2]).tag == comp_tag[2]) begin    // alternate table as lower history tables
-                    t_pred_pkt.altpred = table_2.sub(index[2]).ctr[2];
-                    let alt_tableNo = 3'b011;
-                end
-                else if(table_1.sub(index[1]).tag == comp_tag[1]) begin
-                    t_pred_pkt.altpred = table_1.sub(index[1]).ctr[2];
-                    let alt_tableNo = 3'b010;
-                end
-                else if(table_0.sub(index[0]).tag == comp_tag[0]) begin
-                    t_pred_pkt.altpred = table_0.sub(index[0]).ctr[2];
-                    let alt_tableNo = 3'b001;
-                end
+            function Prediction_Packet generatePredPktEntry(TagEntry tableEntry, Tag tableTag, TABLENO tableNo, Bool alt);
+                
+                Prediction_Packet tempPkt = unpack(0);
+                if (alt == False) begin
+                    tempPkt.pred = tableEntry.ctr[2];
+                    tempPkt.ctr[tableNo] = tableEntry.ctr;
+                    tempPkt.tableNo = tableNo;
+                    end
                 else begin
-                    t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
-                    let alt_tableNo = 3'b000;
+                    tempPkt.altpred = tableEntry.ctr[2];
+                end
+                return tempPkt;
+            endfunction 
+
+            t_pred_pkt.pred = bimodal.sub(bimodal_index).ctr[1];
+            t_pred_pkt.ctr[0] = zeroExtend(bimodal.sub(bimodal_index).ctr);
+            t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
+            t_pred_pkt.tableNo = 3'b000;
+
+            Bool alt = False;
+            for(Integer i = 3; i>=0; i=i-1) begin
+                let tbl =  tables[i];
+                if (tbl.sub(index[i]).tag == comp_tag[i]) begin
+                    t_pred_pkt = generatePredPktEntry(tbl.sub(index[i]), comp_tag[i], fromInteger(i+1),alt);
+                    alt = True;
                 end
             end
-            else if(table_2.sub(index[2]).tag == comp_tag[2]) begin          //comparing tag and computed tag T3
-                t_pred_pkt.pred = table_2.sub(index[2]).ctr[2];
-                t_pred_pkt.ctr[3] = table_2.sub(index[2]).ctr;
-                t_pred_pkt.tableNo = 3'b011;
-                if(table_1.sub(index[1]).tag == comp_tag[1]) begin
-                    t_pred_pkt.altpred = table_1.sub(index[1]).ctr[2];
-                    let alt_tableNo = 3'b010;
-                end
-                else if(table_0.sub(index[0]).tag == comp_tag[0]) begin
-                    t_pred_pkt.altpred = table_0.sub(index[0]).ctr[2];
-                    let alt_tableNo = 3'b001;                                                 // alternate table as lower history tables
-                end
-            else begin
-                    t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
-                    let alt_tableNo = 3'b000;
-                end
-            end
-            else if(table_1.sub(index[1]).tag == comp_tag[1]) begin          //comparing tag and computed tag T2
-                t_pred_pkt.pred = table_1.sub(index[1]).ctr[2];
-                t_pred_pkt.ctr[2] = table_1.sub(index[1]).ctr;
-                t_pred_pkt.tableNo = 3'b010;
-                if(table_0.sub(index[0]).tag == comp_tag[0]) begin
-                    t_pred_pkt.altpred = table_0.sub(index[0]).ctr[2];
-                    let alt_tableNo = 3'b001;                                                   // alternate table as lower history tables
-                end
-            else begin
-                    t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
-                    let alt_tableNo = 3'b000;
-                end
-            end
-            else if(table_0.sub(index[0]).tag == comp_tag[0]) begin                          //comparing tag and computed tag T1
-                t_pred_pkt.pred = table_0.sub(index[0]).ctr[2];
-                t_pred_pkt.tableNo = 3'b001;
-                t_pred_pkt.ctr[1] = table_0.sub(index[0]).ctr;
-                t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
-                let alt_tableNo = 3'b000;                   // alternate table as lower history tables
-            end
-            else begin
-                t_pred_pkt.pred = bimodal.sub(bimodal_index).ctr[1];
-                t_pred_pkt.ctr[0] = zeroExtend(bimodal.sub(bimodal_index).ctr);
-                t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
-                t_pred_pkt.tableNo = 3'b000;
-                let alt_tableNo = 3'b000;
-            end
+
+            // if (table_3.sub(index[3]).tag == comp_tag[3]) begin
+            //     t_pred_pkt = generatePredPktEntry(table_3.sub(index[3]),comp_tag[3], 3'b100, False);
+            //     if(table_2.sub(index[2]).tag == comp_tag[2])
+            //         t_pred_pkt = generatePredPktEntry(table_2.sub(index[2]),comp_tag[2], 3'b011,True);
+            //     else if(table_1.sub(index[1]).tag == comp_tag[1])
+            //         t_pred_pkt = generatePredPktEntry(table_1.sub(index[1]),comp_tag[1], 3'b010,True);
+            //     else if(table_0.sub(index[0]).tag == comp_tag[0])
+            //         t_pred_pkt = generatePredPktEntry(table_0.sub(index[0]),comp_tag[0], 3'b001, True);
+            // end
+
+
+
+
+            // if(table_3.sub(index[3]).tag == comp_tag[3]) begin      //comparing tag and computed tag T4
+            //     t_pred_pkt.pred = table_3.sub(index[3]).ctr[2];   //ctr[2]
+            //     t_pred_pkt.ctr[4] = table_3.sub(index[3]).ctr;
+            //     t_pred_pkt.tableNo = 3'b100;
+            //     if(table_2.sub(index[2]).tag == comp_tag[2]) begin    // alternate table as lower history tables
+            //         t_pred_pkt.altpred = table_2.sub(index[2]).ctr[2];
+            //         let alt_tableNo = 3'b011;
+            //     end
+            //     else if(table_1.sub(index[1]).tag == comp_tag[1]) begin
+            //         t_pred_pkt.altpred = table_1.sub(index[1]).ctr[2];
+            //         let alt_tableNo = 3'b010;
+            //     end
+            //     else if(table_0.sub(index[0]).tag == comp_tag[0]) begin
+            //         t_pred_pkt.altpred = table_0.sub(index[0]).ctr[2];
+            //         let alt_tableNo = 3'b001;
+            //     end
+            //     else begin
+            //         t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
+            //         let alt_tableNo = 3'b000;
+            //     end
+            // end
+            // else if(table_2.sub(index[2]).tag == comp_tag[2]) begin          //comparing tag and computed tag T3
+            //     t_pred_pkt.pred = table_2.sub(index[2]).ctr[2];
+            //     t_pred_pkt.ctr[3] = table_2.sub(index[2]).ctr;
+            //     t_pred_pkt.tableNo = 3'b011;
+            //     if(table_1.sub(index[1]).tag == comp_tag[1]) begin
+            //         t_pred_pkt.altpred = table_1.sub(index[1]).ctr[2];
+            //         let alt_tableNo = 3'b010;
+            //     end
+            //     else if(table_0.sub(index[0]).tag == comp_tag[0]) begin
+            //         t_pred_pkt.altpred = table_0.sub(index[0]).ctr[2];
+            //         let alt_tableNo = 3'b001;                                                 // alternate table as lower history tables
+            //     end
+            // else begin
+            //         t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
+            //         let alt_tableNo = 3'b000;
+            //     end
+            // end
+            // else if(table_1.sub(index[1]).tag == comp_tag[1]) begin          //comparing tag and computed tag T2
+            //     t_pred_pkt.pred = table_1.sub(index[1]).ctr[2];
+            //     t_pred_pkt.ctr[2] = table_1.sub(index[1]).ctr;
+            //     t_pred_pkt.tableNo = 3'b010;
+            //     if(table_0.sub(index[0]).tag == comp_tag[0]) begin
+            //         t_pred_pkt.altpred = table_0.sub(index[0]).ctr[2];
+            //         let alt_tableNo = 3'b001;                                                   // alternate table as lower history tables
+            //     end
+            // else begin
+            //         t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
+            //         let alt_tableNo = 3'b000;
+            //     end
+            // end
+            // else if(table_0.sub(index[0]).tag == comp_tag[0]) begin                          //comparing tag and computed tag T1
+            //     t_pred_pkt.pred = table_0.sub(index[0]).ctr[2];
+            //     t_pred_pkt.tableNo = 3'b001;
+            //     t_pred_pkt.ctr[1] = table_0.sub(index[0]).ctr;
+            //     t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
+            //     let alt_tableNo = 3'b000;                   // alternate table as lower history tables
+            // end
+            // else begin
+            //     t_pred_pkt.pred = bimodal.sub(bimodal_index).ctr[1];
+            //     t_pred_pkt.ctr[0] = zeroExtend(bimodal.sub(bimodal_index).ctr);
+            //     t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
+            //     t_pred_pkt.tableNo = 3'b000;
+            //     let alt_tableNo = 3'b000;
+            // end
 
             t_pred_pkt.ghr = ghr;
             rw_pred.wset(t_pred_pkt.pred);
