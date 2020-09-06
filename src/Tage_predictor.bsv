@@ -6,7 +6,6 @@ package Tage_predictor;
 
 	`include "parameter.bsv"
 
-
 	interface Tage_predictor_IFC;
 		method Action computePrediction(ProgramCounter pc);	//Indexing Table,Tag Computation, Comparison of Tag, Obtaining Prediction
 		method Action updateTablePred(UpdationPacket upd_pkt);	//Updation of Usefulness Counter and Prediction Counter, Allocation of new entries in case of misprediction
@@ -26,29 +25,25 @@ package Tage_predictor;
 		RegFile#(TagTableIndex, TagEntry) table_2 <- mkRegFile(0, table_max);
 		RegFile#(TagTableIndex, TagEntry) table_3 <- mkRegFile(0, table_max);
 		Reg#(PathHistory) phr <- mkReg(0);
-
 		RegFile#(TagTableIndex, TagEntry) tables[4] = {table_0, table_1, table_2, table_3};
-
 		RWire#(UpdationPacket) rw_upd_pkt <- mkRWire();
 		RWire#(Prediction)	rw_pred <- mkRWire();
 		RWire#(Bit#(1)) upd_pkt_recvd <- mkRWire();
 		Wire#(ProgramCounter) w_pc <- mkWire();
 
-		rule rl_update_GHR ;
+		rule rl_update_GHR;
+		
 			let t_ghr = ghr;
 			let t_phr = phr;
-
 			let updateRecvd = fromMaybe(0,upd_pkt_recvd.wget());    
 			let t_u_pkt = fromMaybe (?, rw_upd_pkt.wget());
-			
+
 			if(updateRecvd == 1'b1 && t_u_pkt.mispred == 1'b1) begin // updation of GHR at updationPacket.
 				t_u_pkt.ghr = (t_u_pkt.ghr >> 1);
-
 				if(t_u_pkt.actualOutcome == 1)
 					t_ghr = (t_u_pkt.ghr << 1) + 131'b1;
 				else
 					t_ghr = (t_u_pkt.ghr << 1);
-				
 				t_phr = (t_u_pkt.phr >> 1);
 			end
 			else if(updateRecvd == 1'b1 && t_u_pkt.mispred == 1'b0) begin
@@ -57,11 +52,10 @@ package Tage_predictor;
 					t_ghr = (t_u_pkt.ghr << 1) + 131'b1;
 				else
 					t_ghr = (t_u_pkt.ghr << 1);
-					t_phr = t_u_pkt.phr;
+				t_phr = t_u_pkt.phr;
 			end
 			else begin                                             //speculative updation of GHR and PHR
 				let pred = fromMaybe(?,rw_pred.wget());
-				//let w_pc = fromMaybe(?,rw_pc.wget());
 				`ifdef DISPLAY 
 					$display("PC = %h", w_pc);
 				`endif
@@ -79,14 +73,14 @@ package Tage_predictor;
 				$display("GHR after updation: %b",t_ghr);
 				$display("PHR after updation: %b",t_phr);
 			`endif
-
+			
 			ghr <= t_ghr;
 			phr <= t_phr;
 		endrule
 
 
 		method Action computePrediction(ProgramCounter pc);
-
+		
 			//tags
 			Tag comp_tag[4];
 
@@ -105,14 +99,11 @@ package Tage_predictor;
 
 			`ifdef DISPLAY
 				$display("\nGHR before prediction = %h",ghr);
-
 				$display("\n\nPrediction Packet of last Prediction\n",fshow(pred_pkt), cur_cycle);
-
 				$display("Calculating Index..... ");
 			`endif
 
 			//calling index computation function for each table and calling tag computation function for each table
-
 			bimodalindex = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b000));
 			t_pred_pkt.bimodalindex = bimodalindex;
 			for (Integer i = 0; i < 4; i=i+1) begin
@@ -120,42 +111,41 @@ package Tage_predictor;
 				index[i] = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,tNo));
 				t_pred_pkt.tagTableindex[i] = index[i];
 				if(i<2) begin
-                    comp_tag[i] = tagged Tag2 truncate(compFoldTag(pc,ghr,tNo));
-                    t_pred_pkt.tableTag[i] = comp_tag[i];
-                end
-                else begin
-                    comp_tag[i] = tagged Tag1 truncate(compFoldTag(pc,ghr,tNo));
-                    t_pred_pkt.tableTag[i] = comp_tag[i];
-                end
+					comp_tag[i] = tagged Tag2 truncate(compFoldTag(pc,ghr,tNo));
+					t_pred_pkt.tableTag[i] = comp_tag[i];
+					end
+				else begin
+					comp_tag[i] = tagged Tag1 truncate(compFoldTag(pc,ghr,tNo));
+					t_pred_pkt.tableTag[i] = comp_tag[i];
+				end
 			end
 
 
 			//comparison of tag with the longest history table, getting prediction from it and alternate prediction from second longest tag matching table 
 			t_pred_pkt.tableNo = 3'b000;
-            t_pred_pkt.altpred = bimodal.sub(bimodalindex).ctr[1];
-            t_pred_pkt.pred = bimodal.sub(bimodalindex).ctr[1];
-            t_pred_pkt.ctr[0] = zeroExtend(bimodal.sub(bimodalindex).ctr);
-            Bool matched = False;
+			t_pred_pkt.altpred = bimodal.sub(bimodalindex).ctr[1];
+			t_pred_pkt.pred = bimodal.sub(bimodalindex).ctr[1];
+			t_pred_pkt.ctr[0] = zeroExtend(bimodal.sub(bimodalindex).ctr);
+			Bool matched = False;
 			for (Integer i = 3; i >= 0; i=i-1) begin
 				if(tables[i].sub(index[i]).tag == comp_tag[i] && matched == False) begin
-                    if(matched) 
-                        t_pred_pkt.altpred = tables[i].sub(index[i]).ctr[2];
-                    else begin
-                        t_pred_pkt.ctr[i+1] = tables[i].sub(index[i]).ctr;
-                        t_pred_pkt.pred = tables[i].sub(index[i]).ctr[2];
-                        t_pred_pkt.tableNo = fromInteger(i+1);         
-                        matched = True;
-                    end
-                end
+					if(matched) 
+						t_pred_pkt.altpred = tables[i].sub(index[i]).ctr[2];
+					else begin
+						t_pred_pkt.ctr[i+1] = tables[i].sub(index[i]).ctr;
+						t_pred_pkt.pred = tables[i].sub(index[i]).ctr[2];
+						t_pred_pkt.tableNo = fromInteger(i+1);         
+						matched = True;
+					end
+				end
 			end
-
-
+			
 			t_pred_pkt.ghr = ghr;						//storing current GHR in the temporary prediction packet
-
 			rw_pred.wset(t_pred_pkt.pred);				//setting RWire for corresponding GHR updation in the rule
 			w_pc<=pc;
 
-			if(t_pred_pkt.pred == 1'b1)	 	 	 	 	//speculative update of GHR storing in temporary prediction packet
+			//speculative update of GHR storing in temporary prediction packet
+			if(t_pred_pkt.pred == 1'b1)	 	 	 	 	
 				t_pred_pkt.ghr = ( t_pred_pkt.ghr  << 1 ) + 131'b1;
 			else
 				t_pred_pkt.ghr = ( t_pred_pkt.ghr  << 1 );
@@ -174,8 +164,7 @@ package Tage_predictor;
 
 			rw_upd_pkt.wset(upd_pkt);
 			upd_pkt_recvd.wset(1'b1);
-
-
+            
 			//store the indexes of each entry of predictor tables from the updation packet
 			//Store the corresponding indexed entry whose index is obtained from the updation packet
 			TagTableIndex ind[4];
@@ -210,7 +199,6 @@ package Tage_predictor;
 
 			// updation of provider component's prediction counter
 			/* Provider component's prediction counter is incremented if actual outcome is TAKEN and decremented if actual outcome is NOT TAKEN */
-
 			if(upd_pkt.actualOutcome == 1'b1) begin
 				if(upd_pkt.tableNo == 3'b000)
 					t_bimodal.ctr = (t_bimodal.ctr < 2'b11) ? (t_bimodal.ctr + 2'b1) : 2'b11;
@@ -223,7 +211,7 @@ package Tage_predictor;
 				else
 					t_table[upd_pkt.tableNo-1].ctr = (t_table[upd_pkt.tableNo-1].ctr > 3'b000)?(t_table[upd_pkt.tableNo-1].ctr - 3'b1): 3'b000;
 			end
-			
+
 			//Allocation of new entries if there is a misprediction
 			/* Allocate new entry, if there is any u = 0 (not useful entry) for tables with longer history 
 				Three cases arise: all u>0 , one u = 0, more than one u = 0
@@ -234,7 +222,6 @@ package Tage_predictor;
 				For the newly allocated entry, usefuleness counter is set to 0.
 				For the newly allocated entry, tag is computed tag stored in the updation packet for that entry
 			*/
-
 			if (upd_pkt.mispred == 1'b1) begin
 				case (upd_pkt.tableNo)
 					3'b000 :	begin
@@ -247,7 +234,6 @@ package Tage_predictor;
 											allocate = True;
 										end
 									end
-
 									if (allocate == False) begin
 										for (Integer i = 0; i < 4; i = i + 1) 
 											t_table[i].uCtr = 2'b0;
@@ -263,7 +249,6 @@ package Tage_predictor;
 											allocate = True;
 										end
 									end
-
 									if (allocate == False) begin
 										for (Integer i = 1; i < 4; i = i + 1) 
 											t_table[i].uCtr = 2'b0;
@@ -279,7 +264,6 @@ package Tage_predictor;
 											allocate = True;
 										end
 									end
-
 									if (allocate == False) begin
 										for (Integer i = 2; i < 4; i = i + 1) 
 											t_table[i].uCtr = 2'b0;
@@ -293,9 +277,8 @@ package Tage_predictor;
 										t_table[3].ctr = (upd_pkt.actualOutcome == 1'b1) ? 3'b100 : 3'b011 ;
 										allocate = True;
 									end
-
 									if (allocate == False) begin
-											t_table[3].uCtr = 2'b0;
+										t_table[3].uCtr = 2'b0;
 									end
 								end
 				endcase
