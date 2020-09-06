@@ -222,7 +222,6 @@ package Tage_predictor;
 				For the newly allocated entry, usefuleness counter is set to 0.
 				For the newly allocated entry, tag is computed tag stored in the updation packet for that entry
 			*/
-
 			if (upd_pkt.mispred == 1'b1) begin
 				case (upd_pkt.tableNo)
 					3'b000 :	begin
@@ -235,7 +234,6 @@ package Tage_predictor;
 											allocate = True;
 										end
 									end
-
 									if (allocate == False) begin
 										for (Integer i = 0; i < 4; i = i + 1) 
 											t_table[i].uCtr = 2'b0;
@@ -251,7 +249,6 @@ package Tage_predictor;
 											allocate = True;
 										end
 									end
-
 									if (allocate == False) begin
 										for (Integer i = 1; i < 4; i = i + 1) 
 											t_table[i].uCtr = 2'b0;
@@ -267,7 +264,6 @@ package Tage_predictor;
 											allocate = True;
 										end
 									end
-
 									if (allocate == False) begin
 										for (Integer i = 2; i < 4; i = i + 1) 
 											t_table[i].uCtr = 2'b0;
@@ -281,9 +277,8 @@ package Tage_predictor;
 										t_table[3].ctr = (upd_pkt.actualOutcome == 1'b1) ? 3'b100 : 3'b011 ;
 										allocate = True;
 									end
-
 									if (allocate == False) begin
-											t_table[3].uCtr = 2'b0;
+										t_table[3].uCtr = 2'b0;
 									end
 								end
 				endcase
