@@ -1,124 +1,83 @@
 package Type_TAGE;
 
+
 import Vector :: *;
 import FShow :: *;
 
 export Type_TAGE :: *;
 `include "parameter.bsv"
 
-typedef     1                     ACTUAL_outcome_bits;
-typedef     2                     CTR_BIMODAL_BITS;
-typedef     2                     U_bits;
-typedef     3                     CTR_bits;
-typedef     131                   GHRSIZE_bits;
-typedef     3                     TABLENO_bits;
-typedef     1                     ALTPRED_bits;
-typedef     1                     PRED_bits;
-typedef     64                    PC_bits;
-typedef     1	                    MISPRED_bit;
-typedef     32                    GEOMLENGTH_bits;
-typedef     32                    TARGETLENGTH_bits;
+typedef Bit#(`PC_LEN)                               ProgramCounter;                           //64bits
+typedef Bit#(TAdd#(`GHR4,1))                        GlobalHistory;                          //131bits
+typedef Bit#(TLog#(TAdd#(`NUMTAGTABLES,1)))         TableNo;                      // 000, 001, 010, 011, 100
+typedef Bit#(TLog#(`BIMODALSIZE))                   BimodalIndex;                 //8bits
+typedef Bit#(TLog#(`TABLESIZE))                     TagTableIndex;                        //7bits
+typedef Bit#(`BIMODAL_CTR_LEN)                      BimodalCtr;                  //2bits counter
+typedef Bit#(`TAGTABLE_CTR_LEN)                     TagTableCtr;                          //3bits counter
+typedef Bit#(`TAG1_SIZE)                            TableTag1;                         //8bits
+typedef Bit#(`TAG2_SIZE)                            TableTag2;                         //9bits
+typedef Bit#(`U_LEN)                                UsefulCtr;                   //2bits
+typedef Bit#(`OUTCOME)                              ActualOutcome;               //1bit
+typedef Bit#(`PRED)                                 Prediction;                         //1bit
+typedef Bit#(`PRED)                                 AltPrediction;                      //1bit
+typedef Bit#(`PRED)                                 Misprediction;                      //misprediction bit
+typedef Bit#(`GEOM_LEN)                             GeomLength;                    //geomlength of each table
+typedef Bit#(`TARGET_LEN)                           TargetLength;                 //targetlength
+typedef Bit#(`PHR_LEN)                              PathHistory;
 
-typedef Bit#(PC_bits)             PC;                           //64bits
-typedef Bit#(GHRSIZE_bits)        GHR;                          //131bits
-typedef Bit#(TABLENO_bits)        TABLENO;                      //000, 001, 010, 011, 100
-typedef Bit#(TLog#(`BIMODALSIZE)) BIMODALINDEX;                 //8bits
-typedef Bit#(TLog#(`TABLESIZE))   INDEX;                        //7bits
-typedef Bit#(CTR_BIMODAL_BITS)    CTR_BIMODAL;                  //2bits counter
-typedef Bit#(CTR_bits)            CTR;                          //3bits counter
-typedef Bit#(`TAG1_SIZE)	        TAG1;                         //8bits
-typedef Bit#(`TAG2_SIZE)		      TAG2;                         //9bits
-typedef Bit#(U_bits)              Usefulbits;                   //2bits
-typedef Bit#(ACTUAL_outcome_bits) ACTUAL_OUTCOME;               //1bit
-typedef Bit#(PRED_bits)           PRED;                         //1bit
-typedef Bit#(ALTPRED_bits)        ALTPRED;                      //1bit
-typedef Bit#(MISPRED_bit)	        MISPRED;                      //misprediction bit
-typedef Bit#(GEOMLENGTH_bits)     GEOMETRIC;                    //geomlength of each table
-typedef Bit#(TARGETLENGTH_bits)   TARGETLENGTH;                 //targetlength
-typedef Bit#(`PHR_LEN)            PHR;
-
-// typedef struct {
-//     int tagSize;
-//     Bit#(tagSize) tag;
-//     Bit#(CTR_bits) ctr;
-//     Bit#(U_bits) ubit;
-// } TagEntry deriving(Bits, Eq, FShow);
-
-// typedef union tagged {
-//   bit [4:0] Register;
-//   bit [21:0] Literal;
-//   struct {
-//   bit [4:0] regAddr;
-//   bit [4:0] regIndex;
-//   } Indexed;
-// } InstrOperand;
-typedef union tagged{
-      Bit#(`TAG1_SIZE) Tag1;
-      Bit#(`TAG2_SIZE) Tag2;
-    } Tag deriving(Bits, Eq, FShow);
+typedef union tagged {
+    TableTag1 Tag1;
+    TableTag2 Tag2;
+} Tag deriving(Bits, Eq, FShow);
 
 typedef struct {
-    Bit#(CTR_bits) ctr;
-    Bit#(U_bits) ubit;
+    TagTableCtr ctr;
+    UsefulCtr uCtr;
     Tag tag; 
 } TagEntry deriving(Bits, Eq, FShow);
 
 
-
 typedef struct {
-    CTR ctr;
-    TAG1 tag;
-    Usefulbits ubit;
-} Tag_Entry1 deriving(Bits, Eq, FShow);
-
-typedef struct {
-    CTR ctr;
-    TAG2 tag;
-    Usefulbits ubit;
-} Tag_Entry2 deriving(Bits, Eq, FShow);
-
-typedef struct {
-	CTR_BIMODAL ctr;
-} Bimodal_Entry deriving(Bits, Eq, FShow);
+    BimodalCtr ctr;
+} BimodalEntry deriving(Bits, Eq, FShow);
 
 
 
 typedef struct {
-    BIMODALINDEX                                  bimodalindex;
-    Vector#(`NUMTAGTABLES, INDEX)                 index;
-    Vector#(TSub#(`NUMTAGTABLES,2), Tag)     	  comp_tag1_table;
-    Vector#(TSub#(`NUMTAGTABLES,2), Tag)     	  comp_tag2_table;
-    Vector#(`NUMTAGTABLES, Usefulbits)  		      usefulbits;
-    Vector#(TAdd#(`NUMTAGTABLES,1), CTR)          ctr;
-    GHR             		                          ghr;
-    PRED            		                          pred;
-    TABLENO      	                                tableNo;
-    ALTPRED         		                          altpred;
-    PHR                                           phr;
-   } Prediction_Packet deriving(Bits, Eq, FShow);
+    BimodalIndex                                  bimodalindex;
+    Vector#(`NUMTAGTABLES, TagTableIndex)         tagTableindex;
+    Vector#(`NUMTAGTABLES, Tag)                   tableTag;
+    Vector#(`NUMTAGTABLES, UsefulCtr)             uCtr;
+    Vector#(TAdd#(`NUMTAGTABLES,1), TagTableCtr)  ctr;
+    GlobalHistory                                 ghr;
+    Prediction                                    pred;
+    TableNo                                       tableNo;
+    AltPrediction                                 altpred;
+    PathHistory                                   phr;
+} PredictionPacket deriving(Bits, Eq, FShow);
 
 typedef struct {
-    BIMODALINDEX	     		                        bimodalindex;
-    Vector#(`NUMTAGTABLES, INDEX)                 index;
-    Vector#(TSub#(`NUMTAGTABLES,2), Tag)         comp_tag1_table;
-    Vector#(TSub#(`NUMTAGTABLES,2), Tag)         comp_tag2_table;
-    Vector#(`NUMTAGTABLES, Usefulbits) 			      usefulbits;
-    Vector#(TAdd#(`NUMTAGTABLES,1), CTR)          ctr;
-    PRED            		                          pred;
-    GHR             		                  	      ghr;
-    TABLENO      	                                tableNo;
-    ALTPRED         		                          altpred;
-    MISPRED				                                mispred;
-    ACTUAL_OUTCOME                                actual_outcome;
-    PHR                                           phr;
-    } Updation_Packet deriving(Bits,Eq, FShow);
+    BimodalIndex                                  bimodalindex;
+    Vector#(`NUMTAGTABLES, TagTableIndex)         tagTableindex;
+    Vector#(`NUMTAGTABLES, Tag)                   tableTag;
+    Vector#(`NUMTAGTABLES, UsefulCtr)             uCtr;
+    Vector#(TAdd#(`NUMTAGTABLES,1), TagTableCtr)  ctr;
+    Prediction                                    pred;
+    GlobalHistory                                 ghr;
+    TableNo                                       tableNo;
+    AltPrediction                                 altpred;
+    Misprediction                                 mispred;
+    ActualOutcome                                 actualOutcome;
+    PathHistory                                   phr;
+} UpdationPacket deriving(Bits,Eq, FShow);
 
 typedef struct {
-    Int#(32)                                      prediction_ctr;
-    Int#(32)                                      misprediction_ctr;
-} Table_ctrs deriving(Bits, Eq, FShow);
+    Int#(32)                                      predictionCtr;
+    Int#(32)                                      mispredictionCtr;
+} TableCounters deriving(Bits, Eq, FShow);
 
-function Bit#(64) compHistFn(GHR ghr,TARGETLENGTH targetlength,GEOMETRIC geomlength);
+function Bit#(64) compHistFn(GlobalHistory ghr, TargetLength targetlength, GeomLength geomlength);
+
     Bit#(32) mask = (1 << targetlength) - 32'b1;
     Bit#(32) mask1 = zeroExtend(ghr[geomlength]) << (geomlength % targetlength);
     Bit#(32) mask2 = (1 << targetlength);
@@ -128,69 +87,71 @@ function Bit#(64) compHistFn(GHR ghr,TARGETLENGTH targetlength,GEOMETRIC geomlen
     compHist = compHist ^ mask1;
     compHist = compHist & mask;
     return zeroExtend(compHist);
-endfunction
+  endfunction
+
 
 
 //verilog code history function definition
-function Bit#(64) compFoldIndex(PC pc,GHR ghr,PHR phr,TABLENO ti);
+function Bit#(64) compFoldIndex(ProgramCounter pc, GlobalHistory ghr, PathHistory phr, TableNo ti);
 
-		Bit#(64) index = 0;
-		if (ti == 3'b000) begin
-		        index = pc[`BIMODAL_LEN - 1:0];        //13bit pc
-			return index;
-		end
-		else if (ti == 3'b001) begin
-      let comp_hist = compHistFn(ghr, `TABLE_LEN, `GEOMETRIC1);
-			index = pc ^ (pc >> `TABLE_LEN) ^ comp_hist ^ zeroExtend(phr) ^ (zeroExtend(phr) >> `TABLE_LEN); // indexTagPred[0] = PC ^ (PC >> TAGPREDLOG) ^ indexComp[0].compHist ^ PHR ^ (PHR >> TAGPREDLOG);
-	    return index;
-		end
-	  else if (ti == 3'b010) begin
-			let comp_hist =  compHistFn(ghr, `TABLE_LEN, `GEOMETRIC2);
+        Bit#(64) index = 0;
+        if (ti == 3'b000) begin
+                index = pc[`BIMODAL_LEN - 1:0];        //13bit pc
+            return index;
+        end
+        else if (ti == 3'b001) begin
+      let comp_hist = compHistFn(ghr, `TABLE_LEN, `GHR1);
+            index = pc ^ (pc >> `TABLE_LEN) ^ comp_hist ^ zeroExtend(phr) ^ (zeroExtend(phr) >> `TABLE_LEN); // indexTagPred[0] = PC ^ (PC >> TAGPREDLOG) ^ indexComp[0].compHist ^ PHR ^ (PHR >> TAGPREDLOG);
+        return index;
+        end
+      else if (ti == 3'b010) begin
+            let comp_hist =  compHistFn(ghr, `TABLE_LEN, `GHR2);
       index = pc ^ (pc >> (`TABLE_LEN - 1)) ^ comp_hist ^ zeroExtend(phr) ^ (zeroExtend(phr) >> `TABLE_LEN);
-			return index;
-		end
-		else if (ti == 3'b011) begin
-		  let comp_hist = compHistFn(ghr, `TABLE_LEN, `GEOMETRIC3);
+            return index;
+        end
+        else if (ti == 3'b011) begin
+          let comp_hist = compHistFn(ghr, `TABLE_LEN, `GHR3);
       index = pc ^ (pc >> (`TABLE_LEN - 2)) ^ comp_hist ^ zeroExtend(phr) ^ (zeroExtend(phr) >> `TABLE_LEN);
-			return index;
-		end
-		else begin
-			let comp_hist = compHistFn(ghr, `TABLE_LEN, `GEOMETRIC4);
-      index = pc ^ (pc >> (`TABLE_LEN) - 3) ^ comp_hist ^ zeroExtend(phr) ^ (zeroExtend(phr) >> `TABLE_LEN);
-		  return index;
-		end
+            return index;
+        end
+        else begin
+            let comp_hist = compHistFn(ghr, `TABLE_LEN, `GHR4);
+      index = pc ^ (pc >> (`TABLE_LEN - 3)) ^ comp_hist ^ zeroExtend(phr) ^ (zeroExtend(phr) >> `TABLE_LEN);
+          return index;
+        end
 
 endfunction
 
-function Bit#(64) compFoldTag(PC pc, GHR ghr, TABLENO ti);
+function Bit#(64) compFoldTag(ProgramCounter pc, GlobalHistory ghr, TableNo ti);
   Bit#(64) comp_tag_table = 0;
   if (ti == 3'b001) begin
-    let comp_hist0 = compHistFn(ghr,`TAG2_SIZE, `GEOMETRIC1);
-    let comp_hist1 = compHistFn(ghr,`TAG1_SIZE, `GEOMETRIC1);
+    let comp_hist0 = compHistFn(ghr,`TAG2_SIZE, `GHR1);
+    let comp_hist1 = compHistFn(ghr,`TAG1_SIZE, `GHR1);
     comp_tag_table = pc ^ comp_hist0 ^ (comp_hist1 << 1) ;
     return comp_tag_table;
     // tag[i] = PC ^ tagComp[0][i].compHist ^ (tagComp[1][i].compHist << 1);
   end
   else if (ti == 3'b010) begin
-    let comp_hist0 = compHistFn(ghr,`TAG2_SIZE, `GEOMETRIC2);
-    let comp_hist1 = compHistFn(ghr,`TAG1_SIZE, `GEOMETRIC2);
+    let comp_hist0 = compHistFn(ghr,`TAG2_SIZE, `GHR2);
+    let comp_hist1 = compHistFn(ghr,`TAG1_SIZE, `GHR2);
     comp_tag_table = pc ^ comp_hist0 ^ (comp_hist1 << 1) ;
     return comp_tag_table;
   end
   else if (ti == 3'b011) begin
-    let comp_hist0 = compHistFn(ghr,`TAG2_SIZE, `GEOMETRIC3);
-    let comp_hist1 = compHistFn(ghr,`TAG1_SIZE, `GEOMETRIC3);
+    let comp_hist0 = compHistFn(ghr,`TAG2_SIZE, `GHR3);
+    let comp_hist1 = compHistFn(ghr,`TAG1_SIZE, `GHR3);
     comp_tag_table = pc ^ comp_hist0 ^ (comp_hist1 << 1) ;
     return comp_tag_table;
   end
   else if (ti == 3'b100) begin
-    let comp_hist0 = compHistFn(ghr,`TAG2_SIZE, `GEOMETRIC4);
-    let comp_hist1 = compHistFn(ghr,`TAG1_SIZE, `GEOMETRIC4);
+    let comp_hist0 = compHistFn(ghr,`TAG2_SIZE, `GHR4);
+    let comp_hist1 = compHistFn(ghr,`TAG1_SIZE, `GHR4);
     comp_tag_table = pc ^ comp_hist0 ^ (comp_hist1 << 1) ;
     return comp_tag_table;
   end
   else
     return 0;
+
 endfunction
 
 endpackage
