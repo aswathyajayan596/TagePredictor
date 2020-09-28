@@ -251,7 +251,7 @@ package Tage_predictor;
 
             if(upd_pkt.actualOutcome == 1'b1) begin
                 if(upd_pkt.tableNo == 3'b000)
-                    t_bimodal.ctr = (t_bimodal.ctr < 2'b11) ? (t_bimodal.ctr + 2'b1) : 2'b11;
+                    t_bimodal.ctr = (t_bimodal.ctr < 2'b11) ? (t_bimodal.ctr + 2'b1) : 2'b11 ;
                 else
                     t_table[tagtableNo].ctr = (upd_pkt.ctr[tagtableNo+1]< 3'b111 )?(upd_pkt.ctr[tagtableNo+1] + 3'b1): 3'b111;
             end
