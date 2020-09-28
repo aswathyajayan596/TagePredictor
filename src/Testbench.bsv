@@ -14,7 +14,8 @@ package Testbench;
 
         UpdationPacket t_upd_pkt = unpack(0);
         let mispred = ( t_actual_outcome == t_pred_pkt1.pred ) ? 1'b0 : 1'b1;  //misprediction check
-        t_upd_pkt = UpdationPacket {    mispred : mispred, 
+        t_upd_pkt = UpdationPacket {    
+                                        mispred : mispred, 
                                         actualOutcome:  t_actual_outcome,
                                         bimodalindex:   t_pred_pkt1.bimodalindex,
                                         tagTableindex:  t_pred_pkt1.tagTableindex,
@@ -65,7 +66,7 @@ package Testbench;
         rule rl_display(ctr >= 0);      //display rule for displaying the current cycle
             `ifdef DISPLAY
                 $display("Entered Display rule ");
-                $display("\n\n=====================================================================================================================================================");
+                $display("\n\n============================================================");
                 $display("\nCycle %d   Ctr %d",cur_cycle, ctr);
             `endif
         endrule

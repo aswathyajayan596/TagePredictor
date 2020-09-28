@@ -3,6 +3,7 @@ package Tage_predictor;
     import Utils :: *;
     import Type_TAGE :: *;
     import RegFile :: *;
+    import Vector :: *;
 
     `include "parameter.bsv"
 
@@ -11,6 +12,26 @@ package Tage_predictor;
         method Action updateTablePred(UpdationPacket upd_pkt);  //Updation of Usefulness Counter and Prediction Counter, Allocation of new entries in case of misprediction
         method PredictionPacket output_packet();    // Method to Output the prediction packet.
     endinterface
+
+    function Vector#(4,TagEntry) allocate_entry(Vector#(4,TagEntry) entries, Integer tno, Vector#(4,Tag) tags, ActualOutcome outcome);
+            Bool allocate = False;
+            
+            for (Integer i = 3; i >= tno; i = i - 1) begin    
+                if(entries[i].uCtr == 2'b0 && allocate == False) begin
+                    entries[i].uCtr = 2'b0;
+                    entries[i].tag = tags[i];
+                    entries[i].ctr = (outcome == 1'b1) ? 3'b100 : 3'b011 ;
+                    allocate = True;
+                end
+            end
+            if (allocate == False) begin
+                for (Integer i = tno; i <= 3; i = i + 1) 
+                entries[i].uCtr = 2'b0;
+            end
+            return entries;
+    endfunction
+
+
 
     (*synthesize*)
     module mkTage_predictor(Tage_predictor_IFC);
@@ -130,18 +151,37 @@ package Tage_predictor;
             t_pred_pkt.pred = bimodal.sub(bimodalindex).ctr[1];
             t_pred_pkt.ctr[0] = zeroExtend(bimodal.sub(bimodalindex).ctr);
             Bool matched = False;
+            
+            // for (Integer i = 3; i >= 0; i=i-1) begin
+            //     if(tables[i].sub(index[i]).tag == comp_tag[i] && matched == False) begin
+            //         if(matched) 
+            //             t_pred_pkt.altpred = tables[i].sub(index[i]).ctr[2];
+            //         else begin
+            //             t_pred_pkt.ctr[i+1] = tables[i].sub(index[i]).ctr;
+            //             t_pred_pkt.pred = tables[i].sub(index[i]).ctr[2];
+            //             t_pred_pkt.tableNo = fromInteger(i+1);  
+            //             t_pred_pkt.uCtr[i] = tables[i].sub(index[i]).uCtr; 
+            //             matched = True;
+            //         end
+            //     end
+            // end
+
+            Bool altMatched = False;
             for (Integer i = 3; i >= 0; i=i-1) begin
-                if(tables[i].sub(index[i]).tag == comp_tag[i] && matched == False) begin
-                    if(matched) 
-                        t_pred_pkt.altpred = tables[i].sub(index[i]).ctr[2];
-                    else begin
+                if(tables[i].sub(index[i]).tag == comp_tag[i] && !matched) begin
                         t_pred_pkt.ctr[i+1] = tables[i].sub(index[i]).ctr;
                         t_pred_pkt.pred = tables[i].sub(index[i]).ctr[2];
-                        t_pred_pkt.tableNo = fromInteger(i+1);         
+                        t_pred_pkt.tableNo = fromInteger(i+1); 
+                        t_pred_pkt.uCtr[i] = tables[i].sub(index[i]).uCtr;        
                         matched = True;
-                    end
+                end
+                else if(tables[i].sub(index[i]).tag == comp_tag[i] && matched && !altMatched) begin
+                        t_pred_pkt.altpred = tables[i].sub(index[i]).ctr[2];
+                        altMatched = True;
                 end
             end
+
+            
 
             t_pred_pkt.ghr = ghr;                       //storing current GHR in the temporary prediction packet
             rw_pred.wset(t_pred_pkt.pred);              //setting RWire for corresponding GHR updation in the rule
@@ -172,17 +212,22 @@ package Tage_predictor;
             //store the indexes of each entry of predictor tables from the updation packet
             //Store the corresponding indexed entry whose index is obtained from the updation packet
             TagTableIndex ind[4];
-            TagEntry t_table[4];
+            Vector#(4,TagEntry) t_table;
+            Vector#(4,Tag) table_tags;
+
+            TableNo tagtableNo = upd_pkt.tableNo-1;
 
             BimodalIndex bindex = upd_pkt.bimodalindex;
             BimodalEntry t_bimodal = bimodal.sub(bindex);
             for(Integer i=0; i < 4; i=i+1) begin
-            ind[i] = upd_pkt.tagTableindex[i];
-            t_table[i] = tables[i].sub(ind[i]);
+                ind[i] = upd_pkt.tagTableindex[i];
+                t_table[i] = tables[i].sub(ind[i]);
+                table_tags[i] = upd_pkt.tableTag[i];
             end
 
             //store the actual outcome from the updation packet
             ActualOutcome outcome = upd_pkt.actualOutcome;
+
             `ifdef DISPLAY
             $display("\n\nUpdation Packet\n",fshow(upd_pkt));
             $display("Updation Packet Table Number = %b",upd_pkt.tableNo);
@@ -193,27 +238,28 @@ package Tage_predictor;
             /* Usefulness counter is updated if the final prediction is different from alternate prediction, u is incremented if the prediction is correct
             u is decremented otherwise */
 
-            if(upd_pkt.pred != upd_pkt.altpred) begin
-            if (upd_pkt.mispred == 1'b0)
-            t_table[upd_pkt.tableNo-1].uCtr = t_table[upd_pkt.tableNo-1].uCtr + 2'b1;
-            else
-            t_table[upd_pkt.tableNo-1].uCtr = t_table[upd_pkt.tableNo-1].uCtr - 2'b1;
-            end
 
+            if(upd_pkt.pred != upd_pkt.altpred) begin
+                if (upd_pkt.mispred == 1'b0 && upd_pkt.tableNo != 3'b000)
+                    t_table[tagtableNo].uCtr = upd_pkt.uCtr[tagtableNo] + 2'b1;
+                else
+                    t_table[tagtableNo].uCtr = upd_pkt.uCtr[tagtableNo] - 2'b1;
+            end
 
             // updation of provider component's prediction counter
             /* Provider component's prediction counter is incremented if actual outcome is TAKEN and decremented if actual outcome is NOT TAKEN */
+
             if(upd_pkt.actualOutcome == 1'b1) begin
-            if(upd_pkt.tableNo == 3'b000)
-            t_bimodal.ctr = (t_bimodal.ctr < 2'b11) ? (t_bimodal.ctr + 2'b1) : 2'b11;
-            else
-            t_table[upd_pkt.tableNo-1].ctr = (t_table[upd_pkt.tableNo-1].ctr < 3'b111 )?(t_table[upd_pkt.tableNo-1].ctr + 3'b1): 3'b111;
+                if(upd_pkt.tableNo == 3'b000)
+                    t_bimodal.ctr = (t_bimodal.ctr < 2'b11) ? (t_bimodal.ctr + 2'b1) : 2'b11 ;
+                else
+                    t_table[tagtableNo].ctr = (upd_pkt.ctr[tagtableNo+1]< 3'b111 )?(upd_pkt.ctr[tagtableNo+1] + 3'b1): 3'b111;
             end
             else begin
-            if(upd_pkt.tableNo == 3'b000)
-            t_bimodal.ctr = (t_bimodal.ctr > 2'b00) ? (t_bimodal.ctr - 2'b1) : 2'b00;
-            else
-            t_table[upd_pkt.tableNo-1].ctr = (t_table[upd_pkt.tableNo-1].ctr > 3'b000)?(t_table[upd_pkt.tableNo-1].ctr - 3'b1): 3'b000;
+                if(upd_pkt.tableNo == 3'b000)
+                    t_bimodal.ctr = (t_bimodal.ctr > 2'b00) ? (t_bimodal.ctr - 2'b1) : 2'b00;
+                else
+                    t_table[tagtableNo].ctr = (upd_pkt.ctr[tagtableNo+1] > 3'b000)?(upd_pkt.ctr[tagtableNo+1] - 3'b1): 3'b000;
             end
 
             //Allocation of new entries if there is a misprediction
@@ -226,72 +272,17 @@ package Tage_predictor;
             For the newly allocated entry, usefuleness counter is set to 0.
             For the newly allocated entry, tag is computed tag stored in the updation packet for that entry
             */
+            
+
             if (upd_pkt.mispred == 1'b1) begin
                 case (upd_pkt.tableNo)
-                    3'b000 :    
-                        begin
-                            Bool allocate = False;
-                            for (Integer i = 3; i >= 0; i = i - 1) begin
-                                if(t_table[i].uCtr == 2'b0 && allocate == False) begin
-                                    t_table[i].uCtr = 2'b0;
-                                    t_table[i].tag = upd_pkt.tableTag[i];
-                                    t_table[i].ctr = (upd_pkt.actualOutcome == 1'b1) ? 3'b100 : 3'b011 ;
-                                    allocate = True;
-                                end
-                            end
-                            if (allocate == False) begin
-                                for (Integer i = 0; i < 4; i = i + 1) 
-                                t_table[i].uCtr = 2'b0;
-                            end
-                        end
-                    3'b001 :   
-                        begin
-                            Bool allocate = False;
-                            for (Integer i = 3; i >= 1; i = i - 1) begin
-                                if(t_table[i].uCtr == 2'b0 && allocate == False) begin
-                                t_table[i].uCtr = 2'b0;
-                                t_table[i].tag = upd_pkt.tableTag[i];
-                                t_table[i].ctr = (upd_pkt.actualOutcome == 1'b1) ? 3'b100 : 3'b011 ;
-                                allocate = True;
-                                end
-                            end
-                            if (allocate == False) begin
-                                for (Integer i = 1; i < 4; i = i + 1) 
-                                t_table[i].uCtr = 2'b0;
-                            end
-                        end
-                    3'b010 :    
-                        begin
-                            Bool allocate = False;
-                            for (Integer i = 3; i >= 2; i = i - 1) begin
-                                if(t_table[i].uCtr == 2'b0 && allocate == False) begin
-                                    t_table[i].uCtr = 2'b0;
-                                    t_table[i].tag = upd_pkt.tableTag[i];
-                                    t_table[i].ctr = (upd_pkt.actualOutcome == 1'b1) ? 3'b100 : 3'b011 ;
-                                    allocate = True;
-                                end
-                            end
-                            if (allocate == False) begin
-                                for (Integer i = 2; i < 4; i = i + 1) 
-                                    t_table[i].uCtr = 2'b0;
-                            end
-                        end
-                    3'b011 :    
-                        begin 
-                            Bool allocate = False;
-                            if(t_table[3].uCtr == 2'b0 && allocate == False) begin
-                                t_table[3].uCtr = 2'b0;
-                                t_table[3].tag = upd_pkt.tableTag[3];
-                                t_table[3].ctr = (upd_pkt.actualOutcome == 1'b1) ? 3'b100 : 3'b011 ;
-                                allocate = True;
-                            end
-                            if (allocate == False) begin
-                                t_table[3].uCtr = 2'b0;
-                            end
-                        end
+                    3'b000 :    t_table = allocate_entry(t_table, 0, table_tags, upd_pkt.actualOutcome);
+                    3'b001 :    t_table = allocate_entry(t_table, 1, table_tags, upd_pkt.actualOutcome);
+                    3'b010 :    t_table = allocate_entry(t_table, 2, table_tags, upd_pkt.actualOutcome);
+                    3'b011 :    t_table = allocate_entry(t_table, 3, table_tags, upd_pkt.actualOutcome);
                 endcase
-            end
-
+            end                    
+            
             //Assigning back the corresponding entries to the prediction tables.
             bimodal.upd(bindex,t_bimodal);
             for(Integer i = 0 ; i < 4; i = i+1)
