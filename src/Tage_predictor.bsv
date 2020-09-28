@@ -215,7 +215,7 @@ package Tage_predictor;
             Vector#(4,TagEntry) t_table;
             Vector#(4,Tag) table_tags;
 
-            TableNo tableNo = upd_pkt.tableNo-1;
+            TableNo tagtableNo = upd_pkt.tableNo-1;
 
             BimodalIndex bindex = upd_pkt.bimodalindex;
             BimodalEntry t_bimodal = bimodal.sub(bindex);
@@ -240,10 +240,10 @@ package Tage_predictor;
 
 
             if(upd_pkt.pred != upd_pkt.altpred) begin
-                if (upd_pkt.mispred == 1'b0)
-                    t_table[tableNo].uCtr = upd_pkt.uCtr[tableNo] + 2'b1;
+                if (upd_pkt.mispred == 1'b0 && upd_pkt.tableNo != 3'b000)
+                    t_table[tagtableNo].uCtr = upd_pkt.uCtr[tagtableNo] + 2'b1;
                 else
-                    t_table[tableNo].uCtr = upd_pkt.uCtr[tableNo] - 2'b1;
+                    t_table[tagtableNo].uCtr = upd_pkt.uCtr[tagtableNo] - 2'b1;
             end
 
             // updation of provider component's prediction counter
@@ -253,13 +253,13 @@ package Tage_predictor;
                 if(upd_pkt.tableNo == 3'b000)
                     t_bimodal.ctr = (t_bimodal.ctr < 2'b11) ? (t_bimodal.ctr + 2'b1) : 2'b11;
                 else
-                    t_table[tableNo].ctr = (upd_pkt.ctr[tableNo]< 3'b111 )?(upd_pkt.ctr[tableNo] + 3'b1): 3'b111;
+                    t_table[tagtableNo].ctr = (upd_pkt.ctr[tagtableNo+1]< 3'b111 )?(upd_pkt.ctr[tagtableNo+1] + 3'b1): 3'b111;
             end
             else begin
                 if(upd_pkt.tableNo == 3'b000)
                     t_bimodal.ctr = (t_bimodal.ctr > 2'b00) ? (t_bimodal.ctr - 2'b1) : 2'b00;
                 else
-                    t_table[tableNo].ctr = (upd_pkt.ctr[tableNo] > 3'b000)?(upd_pkt.ctr[tableNo] - 3'b1): 3'b000;
+                    t_table[tagtableNo].ctr = (upd_pkt.ctr[tagtableNo+1] > 3'b000)?(upd_pkt.ctr[tagtableNo+1] - 3'b1): 3'b000;
             end
 
             //Allocation of new entries if there is a misprediction
