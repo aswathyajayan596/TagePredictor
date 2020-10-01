@@ -61,17 +61,18 @@ package Tage_predictor;
         RegFile#(TagTableIndex, TagEntry) table_3 <- mkRegFile(0, table_max);
         Reg#(PathHistory) phr <- mkReg(0);
         RegFile#(TagTableIndex, TagEntry) tables[4] = {table_0, table_1, table_2, table_3};
-        RWire#(UpdationPacket) rw_upd_pkt <- mkRWire();
-        RWire#(Prediction)  rw_pred <- mkRWire();
-        RWire#(Bit#(1)) upd_pkt_recvd <- mkRWire();
+        Wire#(UpdationPacket) w_upd_pkt <- mkWire();
+        Wire#(Prediction)  rw_pred <- mkWire();
+        Wire#(Bit#(1)) upd_pkt_recvd <- mkWire();
         Wire#(ProgramCounter) w_pc <- mkWire();
+        // Reg#(Bool) update <- mkReg(False);
 
         rule rl_update_GHR;
 
             let t_ghr = ghr;
             let t_phr = phr;
-            let updateRecvd = fromMaybe(0,upd_pkt_recvd.wget());    
-            let t_u_pkt = fromMaybe (?, rw_upd_pkt.wget());
+            let updateRecvd = upd_pkt_recvd;    
+            let t_u_pkt = w_upd_pkt;
 
             if(updateRecvd == 1'b1 && t_u_pkt.mispred == 1'b1) begin // updation of GHR at updationPacket.
                 t_u_pkt.ghr = (t_u_pkt.ghr >> 1);
@@ -83,12 +84,12 @@ package Tage_predictor;
                 t_phr = t_u_pkt.phr;
             end
             else begin                                             //speculative updation of GHR and PHR
-                let pred = fromMaybe(?,rw_pred.wget());
+                let pred = rw_pred;
 
                 `ifdef DISPLAY 
                     $display("PC = %h", w_pc);
                 `endif
-                t_ghr = update_GHR(t_u_pkt.ghr, pred);
+                t_ghr = update_GHR(t_ghr, pred);
             end
                 t_phr = update_PHR(t_phr, w_pc);
                 `ifdef DISPLAY
@@ -166,7 +167,7 @@ package Tage_predictor;
             
 
             t_pred_pkt.ghr = ghr;                       //storing current GHR in the temporary prediction packet
-            rw_pred.wset(t_pred_pkt.pred);              //setting RWire for corresponding GHR updation in the rule
+            rw_pred <= t_pred_pkt.pred;              //setting RWire for corresponding GHR updation in the rule
             w_pc<=pc;
 
             //speculative update of GHR storing in temporary prediction packet
@@ -184,8 +185,8 @@ package Tage_predictor;
 
         method Action updateTablePred(UpdationPacket upd_pkt);  //
 
-            rw_upd_pkt.wset(upd_pkt);
-            upd_pkt_recvd.wset(1'b1);
+            w_upd_pkt <= upd_pkt;
+            upd_pkt_recvd <= 1'b1;
 
             //store the indexes of each entry of predictor tables from the updation packet
             //Store the corresponding indexed entry whose index is obtained from the updation packet
