@@ -44,8 +44,8 @@ typedef struct {
 
 
 typedef struct {
-    BimodalIndex                                  bimodalindex;
-    Vector#(`NUMTAGTABLES, TagTableIndex)         tagTableindex;
+    BimodalIndex                                  bimodal_index;
+    Vector#(`NUMTAGTABLES, TagTableIndex)         tagTable_index;
     Vector#(`NUMTAGTABLES, Tag)                   tableTag;
     Vector#(`NUMTAGTABLES, UsefulCtr)             uCtr;
     Vector#(TAdd#(`NUMTAGTABLES,1), TagTableCtr)  ctr;
@@ -57,8 +57,8 @@ typedef struct {
 } PredictionPacket deriving(Bits, Eq, FShow);
 
 typedef struct {
-    BimodalIndex                                  bimodalindex;
-    Vector#(`NUMTAGTABLES, TagTableIndex)         tagTableindex;
+    BimodalIndex                                  bimodal_index;
+    Vector#(`NUMTAGTABLES, TagTableIndex)         tagTable_index;
     Vector#(`NUMTAGTABLES, Tag)                   tableTag;
     Vector#(`NUMTAGTABLES, UsefulCtr)             uCtr;
     Vector#(TAdd#(`NUMTAGTABLES,1), TagTableCtr)  ctr;

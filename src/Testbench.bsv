@@ -17,8 +17,8 @@ package Testbench;
         t_upd_pkt = UpdationPacket {    
                                         mispred : mispred, 
                                         actualOutcome:  t_actual_outcome,
-                                        bimodalindex:   t_pred_pkt1.bimodalindex,
-                                        tagTableindex:  t_pred_pkt1.tagTableindex,
+                                        bimodal_index:   t_pred_pkt1.bimodal_index,
+                                        tagTable_index:  t_pred_pkt1.tagTable_index,
                                         tableTag:       t_pred_pkt1.tableTag,
                                         uCtr:           t_pred_pkt1.uCtr, 
                                         ctr:            t_pred_pkt1.ctr,

@@ -13,6 +13,20 @@ package Tage_predictor;
         method PredictionPacket output_packet();    // Method to Output the prediction packet.
     endinterface
 
+    function GlobalHistory update_GHR(GlobalHistory t_ghr, Bit#(1) pred_or_outcome);
+        t_ghr = (t_ghr << 1);
+        if(pred_or_outcome == 1'b1)
+            t_ghr = t_ghr + 131'b1;
+        return t_ghr;
+    endfunction
+
+    function PathHistory update_PHR(PathHistory t_phr, ProgramCounter t_pc);
+        t_phr = (t_phr << 1);    //to append 0 to LSB
+        if(t_pc[2] == 1'b1)
+            t_phr = t_phr + 32'b1;   //to append 1 to LSB
+        return t_phr;
+    endfunction
+
     function Vector#(4,TagEntry) allocate_entry(Vector#(4,TagEntry) entries, Integer tno, Vector#(4,Tag) tags, ActualOutcome outcome);
             Bool allocate = False;
             
@@ -61,18 +75,11 @@ package Tage_predictor;
 
             if(updateRecvd == 1'b1 && t_u_pkt.mispred == 1'b1) begin // updation of GHR at updationPacket.
                 t_u_pkt.ghr = (t_u_pkt.ghr >> 1);
-                if(t_u_pkt.actualOutcome == 1)
-                    t_ghr = (t_u_pkt.ghr << 1) + 131'b1;
-                else
-                    t_ghr = (t_u_pkt.ghr << 1);
+                t_ghr = update_GHR(t_u_pkt.ghr, t_u_pkt.actualOutcome);
                 t_phr = (t_u_pkt.phr >> 1);
             end
             else if(updateRecvd == 1'b1 && t_u_pkt.mispred == 1'b0) begin
-                t_ghr = t_u_pkt.ghr;
-                if(t_u_pkt.actualOutcome == 1)
-                    t_ghr = (t_u_pkt.ghr << 1) + 131'b1;
-                else
-                    t_ghr = (t_u_pkt.ghr << 1);
+                t_ghr = update_GHR(t_u_pkt.ghr, t_u_pkt.actualOutcome);
                 t_phr = t_u_pkt.phr;
             end
             else begin                                             //speculative updation of GHR and PHR
@@ -81,18 +88,9 @@ package Tage_predictor;
                 `ifdef DISPLAY 
                     $display("PC = %h", w_pc);
                 `endif
-
-                if(pred == 1'b1)
-                    t_ghr = ( t_ghr  << 1 ) + 131'b1;
-                else
-                    t_ghr = ( t_ghr  << 1 );
-                end
-
-                t_phr = (t_phr << 1);
-                if(w_pc[2] == 1'b1) begin
-                    t_phr = t_phr + 32'b1;
-                end
-
+                t_ghr = update_GHR(t_u_pkt.ghr, pred);
+            end
+                t_phr = update_PHR(t_phr, w_pc);
                 `ifdef DISPLAY
                     $display("GHR after updation: %b",t_ghr);
                     $display("PHR after updation: %b",t_phr);
@@ -106,20 +104,17 @@ package Tage_predictor;
         method Action computePrediction(ProgramCounter pc);
 
             //tags
-            Tag comp_tag[4];
+            Tag computedTag[4];
 
             //indexes
-            BimodalIndex bimodalindex;
-            TagTableIndex index[4];
+            BimodalIndex bimodal_index;
+            TagTableIndex tagTable_index[4];
 
             //variable to store temporary prediction packet
             PredictionPacket t_pred_pkt = unpack(0);
 
             //updating PHR in temporary prediction packet
-            t_pred_pkt.phr = phr;
-            t_pred_pkt.phr = (t_pred_pkt.phr << 1);    //to append 0 to LSB
-            if(pc[2] == 1'b1)
-                t_pred_pkt.phr = t_pred_pkt.phr + 32'b1;   //to append 1 to LSB
+            t_pred_pkt.phr = update_PHR(phr, pc);
 
             `ifdef DISPLAY
                 $display("\nGHR before prediction = %h",ghr);
@@ -128,55 +123,42 @@ package Tage_predictor;
             `endif
 
             //calling index computation function for each table and calling tag computation function for each table
-            bimodalindex = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b000));
-            t_pred_pkt.bimodalindex = bimodalindex;
+            bimodal_index = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,3'b000));
+            t_pred_pkt.bimodal_index = bimodal_index;
             for (Integer i = 0; i < 4; i=i+1) begin
                 TableNo tNo = fromInteger(i+1);
-                index[i] = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,tNo));
-                t_pred_pkt.tagTableindex[i] = index[i];
+                tagTable_index[i] = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,tNo));
+                t_pred_pkt.tagTable_index[i] = tagTable_index[i];
                 if(i<2) begin
-                    comp_tag[i] = tagged Tag2 truncate(compFoldTag(pc,ghr,tNo));
-                    t_pred_pkt.tableTag[i] = comp_tag[i];
+                    computedTag[i] = tagged Tag2 truncate(compFoldTag(pc,ghr,tNo));
+                    t_pred_pkt.tableTag[i] = computedTag[i];
                 end
                 else begin
-                    comp_tag[i] = tagged Tag1 truncate(compFoldTag(pc,ghr,tNo));
-                    t_pred_pkt.tableTag[i] = comp_tag[i];
+                    computedTag[i] = tagged Tag1 truncate(compFoldTag(pc,ghr,tNo));
+                    t_pred_pkt.tableTag[i] = computedTag[i];
                 end
             end
 
 
             //comparison of tag with the longest history table, getting prediction from it and alternate prediction from second longest tag matching table 
             t_pred_pkt.tableNo = 3'b000;
-            t_pred_pkt.altpred = bimodal.sub(bimodalindex).ctr[1];
-            t_pred_pkt.pred = bimodal.sub(bimodalindex).ctr[1];
-            t_pred_pkt.ctr[0] = zeroExtend(bimodal.sub(bimodalindex).ctr);
+            t_pred_pkt.altpred = bimodal.sub(bimodal_index).ctr[1];
+            t_pred_pkt.pred = bimodal.sub(bimodal_index).ctr[1];
+            t_pred_pkt.ctr[0] = zeroExtend(bimodal.sub(bimodal_index).ctr);
             Bool matched = False;
-            
-            // for (Integer i = 3; i >= 0; i=i-1) begin
-            //     if(tables[i].sub(index[i]).tag == comp_tag[i] && matched == False) begin
-            //         if(matched) 
-            //             t_pred_pkt.altpred = tables[i].sub(index[i]).ctr[2];
-            //         else begin
-            //             t_pred_pkt.ctr[i+1] = tables[i].sub(index[i]).ctr;
-            //             t_pred_pkt.pred = tables[i].sub(index[i]).ctr[2];
-            //             t_pred_pkt.tableNo = fromInteger(i+1);  
-            //             t_pred_pkt.uCtr[i] = tables[i].sub(index[i]).uCtr; 
-            //             matched = True;
-            //         end
-            //     end
-            // end
+
 
             Bool altMatched = False;
             for (Integer i = 3; i >= 0; i=i-1) begin
-                if(tables[i].sub(index[i]).tag == comp_tag[i] && !matched) begin
-                        t_pred_pkt.ctr[i+1] = tables[i].sub(index[i]).ctr;
-                        t_pred_pkt.pred = tables[i].sub(index[i]).ctr[2];
+                if(tables[i].sub(tagTable_index[i]).tag == computedTag[i] && !matched) begin
+                        t_pred_pkt.ctr[i+1] = tables[i].sub(tagTable_index[i]).ctr;
+                        t_pred_pkt.pred = tables[i].sub(tagTable_index[i]).ctr[2];
                         t_pred_pkt.tableNo = fromInteger(i+1); 
-                        t_pred_pkt.uCtr[i] = tables[i].sub(index[i]).uCtr;        
+                        t_pred_pkt.uCtr[i] = tables[i].sub(tagTable_index[i]).uCtr;        
                         matched = True;
                 end
-                else if(tables[i].sub(index[i]).tag == comp_tag[i] && matched && !altMatched) begin
-                        t_pred_pkt.altpred = tables[i].sub(index[i]).ctr[2];
+                else if(tables[i].sub(tagTable_index[i]).tag == computedTag[i] && matched && !altMatched) begin
+                        t_pred_pkt.altpred = tables[i].sub(tagTable_index[i]).ctr[2];
                         altMatched = True;
                 end
             end
@@ -188,11 +170,7 @@ package Tage_predictor;
             w_pc<=pc;
 
             //speculative update of GHR storing in temporary prediction packet
-            if(t_pred_pkt.pred == 1'b1)                 
-                t_pred_pkt.ghr = ( t_pred_pkt.ghr  << 1 ) + 131'b1;
-            else
-                t_pred_pkt.ghr = ( t_pred_pkt.ghr  << 1 );
-
+            t_pred_pkt.ghr = update_GHR(ghr, t_pred_pkt.pred);
             pred_pkt <= t_pred_pkt;                     //assigning temporary prediction packet to prediction packet vector register
             `ifdef  DISPLAY
                 $display("Current PC = %b", pc);
@@ -217,10 +195,10 @@ package Tage_predictor;
 
             TableNo tagtableNo = upd_pkt.tableNo-1;
 
-            BimodalIndex bindex = upd_pkt.bimodalindex;
+            BimodalIndex bindex = upd_pkt.bimodal_index;
             BimodalEntry t_bimodal = bimodal.sub(bindex);
             for(Integer i=0; i < 4; i=i+1) begin
-                ind[i] = upd_pkt.tagTableindex[i];
+                ind[i] = upd_pkt.tagTable_index[i];
                 t_table[i] = tables[i].sub(ind[i]);
                 table_tags[i] = upd_pkt.tableTag[i];
             end
