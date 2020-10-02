@@ -63,6 +63,8 @@ package Testbench;
             endaction
         endfunction
 
+
+       
         rule rl_display(ctr >= 0);      //display rule for displaying the current cycle
             `ifdef DISPLAY
                 $display("Entered Display rule ");
@@ -76,14 +78,13 @@ package Testbench;
         rule rl_initial(ctr == 0 || upd_pkt.mispred == 1'b1 );
 
             `ifdef DISPLAY
-                $display("rule 1");
-                $display("\nInitialisation of PC and GHR. GHR has value 0 during initial stage.");
+                $display("\nMisprediction happened in last iteration. Starting from current PC");
             `endif
 
             let pc = branches.sub(ctr);
 
             `ifdef DISPLAY
-                $display("\nInitial Program Counter =  %h",pc); 
+                $display("\nProgram Counter =  %h",pc, cur_cycle); 
             `endif
 
             predictor.computePrediction(pc);
@@ -98,7 +99,9 @@ package Testbench;
             UpdationPacket t_u_pkt = unpack(0);
             let pc = branches.sub(ctr);
             t_pred_pkt = predictor.output_packet();
-
+            `ifdef DISPLAY
+            $display("\n\n--------------  Prediction Packet --------------\n\n",fshow(t_pred_pkt), cur_cycle);
+            `endif
             `ifdef DISPLAY
                 $display("\nProgram Counter =  %h", branches.sub(ctr-1));
                 $display("Prediction = %b", t_pred_pkt.pred);
@@ -107,12 +110,15 @@ package Testbench;
             t_u_pkt = get_updation_pkt(t_pred_pkt, actualOutcome.sub((ctr-1)));
 
             `ifdef DISPLAY  
-                $display("Outcome assigned to Updation_Packet = %b", t_u_pkt.actualOutcome);
+                $display("Outcome assigned to Updation_Packet = %b", t_u_pkt.actualOutcome, cur_cycle);
             `endif
 
             upd_pkt <= get_updation_pkt(t_pred_pkt, actualOutcome.sub((ctr-1)));
             predictor.updateTablePred(t_u_pkt);
 
+             `ifdef DISPLAY 
+            $display("\n\n--------------  Assigned Updation Packet ------\n\n",fshow(t_u_pkt), cur_cycle);
+            `endif
             //updating the performance monitoring counters based on the misprediction result obtained in the current cycle
             table_counters(t_u_pkt.tableNo, t_u_pkt.mispred);
             if(t_u_pkt.mispred == 1'b1) begin

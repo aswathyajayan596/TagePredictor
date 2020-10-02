@@ -28,21 +28,20 @@ package Tage_predictor;
     endfunction
 
     function Vector#(4,TagEntry) allocate_entry(Vector#(4,TagEntry) entries, Integer tno, Vector#(4,Tag) tags, ActualOutcome outcome);
-            Bool allocate = False;
-            
-            for (Integer i = 3; i >= tno; i = i - 1) begin    
-                if(entries[i].uCtr == 2'b0 && allocate == False) begin
-                    entries[i].uCtr = 2'b0;
-                    entries[i].tag = tags[i];
-                    entries[i].ctr = (outcome == 1'b1) ? 3'b100 : 3'b011 ;
-                    allocate = True;
-                end
-            end
-            if (allocate == False) begin
-                for (Integer i = tno; i <= 3; i = i + 1) 
+        Bool allocate = False;
+        for (Integer i = 3; i >= tno; i = i - 1) begin    
+            if(entries[i].uCtr == 2'b0 && allocate == False) begin
                 entries[i].uCtr = 2'b0;
+                entries[i].tag = tags[i];
+                entries[i].ctr = (outcome == 1'b1) ? 3'b100 : 3'b011 ;
+                allocate = True;
             end
-            return entries;
+        end
+        if (allocate == False) begin
+            for (Integer i = tno; i <= 3; i = i + 1) 
+            entries[i].uCtr = 2'b0;
+        end
+        return entries;
     endfunction
 
 
@@ -62,51 +61,56 @@ package Tage_predictor;
         Reg#(PathHistory) phr <- mkReg(0);
         RegFile#(TagTableIndex, TagEntry) tables[4] = {table_0, table_1, table_2, table_3};
         Wire#(UpdationPacket) w_upd_pkt <- mkWire();
-        Wire#(Prediction)  rw_pred <- mkWire();
-        Wire#(Bit#(1)) upd_pkt_recvd <- mkWire();
+        Wire#(Prediction)  w_pred <- mkWire();
         Wire#(ProgramCounter) w_pc <- mkWire();
-        // Reg#(Bool) update <- mkReg(False);
+        Wire#(GlobalHistory) w_ghr <- mkWire();
+        Wire#(PathHistory) w_phr <- mkWire();
 
-        rule rl_update_GHR;
+        
+        Wire#(Bool) w_pred_over <- mkWire();
+        Wire#(Bool) w_update_over <- mkWire();
 
-            let t_ghr = ghr;
-            let t_phr = phr;
-            let updateRecvd = upd_pkt_recvd;    
-            let t_u_pkt = w_upd_pkt;
-
-            if(updateRecvd == 1'b1 && t_u_pkt.mispred == 1'b1) begin // updation of GHR at updationPacket.
-                t_u_pkt.ghr = (t_u_pkt.ghr >> 1);
-                t_ghr = update_GHR(t_u_pkt.ghr, t_u_pkt.actualOutcome);
-                t_phr = (t_u_pkt.phr >> 1);
+        rule rl_update(w_update_over == True);
+            PathHistory t_phr = 0;
+            GlobalHistory t_ghr=0;
+            let t_upd_pkt = w_upd_pkt;
+            if (t_upd_pkt.mispred == 1'b1) begin
+                t_upd_pkt.ghr = (t_upd_pkt.ghr >> 1);
+                t_ghr = update_GHR(t_upd_pkt.ghr, t_upd_pkt.actualOutcome);
+                t_phr = t_upd_pkt.phr;
             end
-            else if(updateRecvd == 1'b1 && t_u_pkt.mispred == 1'b0) begin
-                t_ghr = update_GHR(t_u_pkt.ghr, t_u_pkt.actualOutcome);
-                t_phr = t_u_pkt.phr;
-            end
-            else begin                                             //speculative updation of GHR and PHR
-                let pred = rw_pred;
+            w_pred_over <= True;
+            w_ghr <= t_ghr;
+            w_phr <= t_phr;
+            `ifdef DISPLAY
+            $display("Entered rl_update");
+            `endif
+        endrule
 
-                `ifdef DISPLAY 
-                    $display("PC = %h", w_pc);
-                `endif
-                t_ghr = update_GHR(t_ghr, pred);
-            end
-                t_phr = update_PHR(t_phr, w_pc);
-                `ifdef DISPLAY
-                    $display("GHR after updation: %b",t_ghr);
-                    $display("PHR after updation: %b",t_phr);
-                `endif
-
-                ghr <= t_ghr;
-                phr <= t_phr;
+        rule rl_spec_update (w_pred_over == True);
+            w_ghr <= update_GHR(ghr, w_pred);
+            w_phr <= update_PHR(phr, w_pc);
+            `ifdef DISPLAY
+                $display("Entered rl_spec_update");
+            `endif
         endrule
 
 
+        rule rl_GHR_PHR_write;
+            ghr <= w_ghr;
+            phr <= w_phr;
+            `ifdef DISPLAY
+                $display("Entered rl_GHR_PHR_write  ghr = %b, phr = %b", w_ghr, w_phr);    
+            `endif
+        endrule
+       
+
+        
         method Action computePrediction(ProgramCounter pc);
 
             //tags
             Tag computedTag[4];
-
+            
             //indexes
             BimodalIndex bimodal_index;
             TagTableIndex tagTable_index[4];
@@ -152,26 +156,25 @@ package Tage_predictor;
             Bool altMatched = False;
             for (Integer i = 3; i >= 0; i=i-1) begin
                 if(tables[i].sub(tagTable_index[i]).tag == computedTag[i] && !matched) begin
-                        t_pred_pkt.ctr[i+1] = tables[i].sub(tagTable_index[i]).ctr;
-                        t_pred_pkt.pred = tables[i].sub(tagTable_index[i]).ctr[2];
-                        t_pred_pkt.tableNo = fromInteger(i+1); 
-                        t_pred_pkt.uCtr[i] = tables[i].sub(tagTable_index[i]).uCtr;        
-                        matched = True;
+                    t_pred_pkt.ctr[i+1] = tables[i].sub(tagTable_index[i]).ctr;
+                    t_pred_pkt.pred = tables[i].sub(tagTable_index[i]).ctr[2];
+                    t_pred_pkt.tableNo = fromInteger(i+1); 
+                    t_pred_pkt.uCtr[i] = tables[i].sub(tagTable_index[i]).uCtr;        
+                    matched = True;
                 end
                 else if(tables[i].sub(tagTable_index[i]).tag == computedTag[i] && matched && !altMatched) begin
-                        t_pred_pkt.altpred = tables[i].sub(tagTable_index[i]).ctr[2];
-                        altMatched = True;
+                    t_pred_pkt.altpred = tables[i].sub(tagTable_index[i]).ctr[2];
+                    altMatched = True;
                 end
             end
 
-            
-
             t_pred_pkt.ghr = ghr;                       //storing current GHR in the temporary prediction packet
-            rw_pred <= t_pred_pkt.pred;              //setting RWire for corresponding GHR updation in the rule
+            w_pred <= t_pred_pkt.pred;              //setting RWire for corresponding GHR updation in the rule
             w_pc<=pc;
 
             //speculative update of GHR storing in temporary prediction packet
             t_pred_pkt.ghr = update_GHR(ghr, t_pred_pkt.pred);
+            
             pred_pkt <= t_pred_pkt;                     //assigning temporary prediction packet to prediction packet vector register
             `ifdef  DISPLAY
                 $display("Current PC = %b", pc);
@@ -179,15 +182,17 @@ package Tage_predictor;
                 $display("\nPrediction Packet of current Prediction \n", fshow(t_pred_pkt), cur_cycle);
                 $display("Prediction over....");
             `endif
+           
+           w_pred_over <= True;           
 
         endmethod
 
 
-        method Action updateTablePred(UpdationPacket upd_pkt);  //
-
+        method Action updateTablePred(UpdationPacket upd_pkt);  
+            
             w_upd_pkt <= upd_pkt;
-            upd_pkt_recvd <= 1'b1;
 
+            w_update_over <= True;
             //store the indexes of each entry of predictor tables from the updation packet
             //Store the corresponding indexed entry whose index is obtained from the updation packet
             TagTableIndex ind[4];
@@ -208,9 +213,9 @@ package Tage_predictor;
             ActualOutcome outcome = upd_pkt.actualOutcome;
 
             `ifdef DISPLAY
-            $display("\n\nUpdation Packet\n",fshow(upd_pkt));
-            $display("Updation Packet Table Number = %b",upd_pkt.tableNo);
-            $display("GHR = %h", upd_pkt.ghr );
+                $display("\n\nCurrent Updation Packet\n",fshow(upd_pkt));
+                $display("Updation Packet Table Number = %b",upd_pkt.tableNo);
+                $display("GHR = %h", upd_pkt.ghr );
             `endif
 
             //Updation of usefulness counter
