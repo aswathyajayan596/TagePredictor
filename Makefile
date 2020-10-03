@@ -37,7 +37,7 @@ TOPFILE   ?= ./src/Testbench.bsv
 TOPMODULE ?= mkTestbench
 BUILD_DIR ?= ./build_bsim
 #-no-warn-action-shadowing
-BSC_COMP_FLAGS = -elab -keep-fires -aggressive-conditions -no-warn-action-shadowing +RTS -M8G -A128m -RTS
+BSC_COMP_FLAGS = -elab -keep-fires -aggressive-conditions -no-warn-action-shadowing +RTS -M8G -A128m -RTS -show-range-conflict
 BSC_LINK_FLAGS = -keep-fires
 BSC_PATHS = -p ./src:%/Libraries
 

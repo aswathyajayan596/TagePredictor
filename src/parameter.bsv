@@ -1,8 +1,9 @@
 //change this when the trace file is changed
-`define traceSize 10000
+`define traceSize 15
 
 //uncomment below line if you want to see simulation display
 `define  DISPLAY             1
+// `define  DEBUG               1
 
 //change the below parameters for analysis only
 `define     NUMTAGTABLES        4   

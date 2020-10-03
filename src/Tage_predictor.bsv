@@ -82,7 +82,13 @@ package Tage_predictor;
             w_pred_over <= True;
             w_ghr <= t_ghr;
             w_phr <= t_phr;
-            `ifdef DISPLAY
+
+             `ifdef DEBUG
+                $display("Value Assigned to Internal GHR(Updated) : %b", t_ghr);
+                $display("Value Assigned to Internal PHR(Updated) : %b", t_phr);
+            `endif
+
+            `ifdef DEBUG
             $display("Entered rl_update");
             `endif
         endrule
@@ -90,7 +96,16 @@ package Tage_predictor;
         rule rl_spec_update (w_pred_over == True);
             w_ghr <= update_GHR(ghr, w_pred);
             w_phr <= update_PHR(phr, w_pc);
-            `ifdef DISPLAY
+
+            let v_ghr = update_GHR(ghr, w_pred);
+            let v_phr = update_PHR(phr, w_pc);
+
+            `ifdef DEBUG
+                $display("Value Assigned to Internal GHR(Speculative) : %b", v_ghr);
+                $display("Value Assigned to Internal PHR(Speculative) : %b", v_phr);
+            `endif
+
+            `ifdef DEBUG
                 $display("Entered rl_spec_update");
             `endif
         endrule
@@ -99,7 +114,15 @@ package Tage_predictor;
         rule rl_GHR_PHR_write;
             ghr <= w_ghr;
             phr <= w_phr;
-            `ifdef DISPLAY
+            
+             `ifdef DISPLAY
+                $display("Internal GHR(reflected only at next cycle): %b", w_ghr);
+                $display("Internal PHR(reflected only at next cycle): %b", w_phr);
+            `endif
+             
+            
+            
+            `ifdef DEBUG
                 $display("Entered rl_GHR_PHR_write  ghr = %b, phr = %b", w_ghr, w_phr);    
             `endif
         endrule
@@ -121,7 +144,7 @@ package Tage_predictor;
             //updating PHR in temporary prediction packet
             t_pred_pkt.phr = update_PHR(phr, pc);
 
-            `ifdef DISPLAY
+            `ifdef DEBUG
                 $display("\nGHR before prediction = %h",ghr);
                 $display("\n\nPrediction Packet of last Prediction\n",fshow(pred_pkt), cur_cycle);
                 $display("Calculating Index..... ");
@@ -176,7 +199,7 @@ package Tage_predictor;
             t_pred_pkt.ghr = update_GHR(ghr, t_pred_pkt.pred);
             
             pred_pkt <= t_pred_pkt;                     //assigning temporary prediction packet to prediction packet vector register
-            `ifdef  DISPLAY
+            `ifdef  DEBUG
                 $display("Current PC = %b", pc);
                 $display("\nphr = %b",t_pred_pkt.phr);
                 $display("\nPrediction Packet of current Prediction \n", fshow(t_pred_pkt), cur_cycle);
@@ -212,7 +235,7 @@ package Tage_predictor;
             //store the actual outcome from the updation packet
             ActualOutcome outcome = upd_pkt.actualOutcome;
 
-            `ifdef DISPLAY
+            `ifdef DEBUG
                 $display("\n\nCurrent Updation Packet\n",fshow(upd_pkt));
                 $display("Updation Packet Table Number = %b",upd_pkt.tableNo);
                 $display("GHR = %h", upd_pkt.ghr );
@@ -273,7 +296,7 @@ package Tage_predictor;
                 tables[i].upd(ind[i], t_table[i]);
 
             `ifdef DISPLAY
-                $display("\nUpdation over");
+                $display("Updation over\n");
             `endif
 
         endmethod
