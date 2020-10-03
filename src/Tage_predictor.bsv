@@ -39,7 +39,7 @@ package Tage_predictor;
         end
         if (allocate == False) begin
             for (Integer i = tno; i <= 3; i = i + 1) 
-            entries[i].uCtr = 2'b0;
+                entries[i].uCtr = 2'b0;
         end
         return entries;
     endfunction
@@ -119,9 +119,7 @@ package Tage_predictor;
                 $display("Internal GHR(reflected only at next cycle): %b", w_ghr);
                 $display("Internal PHR(reflected only at next cycle): %b", w_phr);
             `endif
-             
-            
-            
+ 
             `ifdef DEBUG
                 $display("Entered rl_GHR_PHR_write  ghr = %b, phr = %b", w_ghr, w_phr);    
             `endif
@@ -158,11 +156,11 @@ package Tage_predictor;
                 tagTable_index[i] = truncate(compFoldIndex(pc,ghr,t_pred_pkt.phr,tNo));
                 t_pred_pkt.tagTable_index[i] = tagTable_index[i];
                 if(i<2) begin
-                    computedTag[i] = tagged Tag2 truncate(compFoldTag(pc,ghr,tNo));
+                    computedTag[i] = tagged Tag1 truncate(compFoldTag(pc,ghr,tNo));
                     t_pred_pkt.tableTag[i] = computedTag[i];
                 end
                 else begin
-                    computedTag[i] = tagged Tag1 truncate(compFoldTag(pc,ghr,tNo));
+                    computedTag[i] = tagged Tag2 truncate(compFoldTag(pc,ghr,tNo));
                     t_pred_pkt.tableTag[i] = computedTag[i];
                 end
             end
@@ -174,8 +172,6 @@ package Tage_predictor;
             t_pred_pkt.pred = bimodal.sub(bimodal_index).ctr[1];
             t_pred_pkt.ctr[0] = zeroExtend(bimodal.sub(bimodal_index).ctr);
             Bool matched = False;
-
-
             Bool altMatched = False;
             for (Integer i = 3; i >= 0; i=i-1) begin
                 if(tables[i].sub(tagTable_index[i]).tag == computedTag[i] && !matched) begin
@@ -191,7 +187,7 @@ package Tage_predictor;
                 end
             end
 
-            t_pred_pkt.ghr = ghr;                       //storing current GHR in the temporary prediction packet
+            
             w_pred <= t_pred_pkt.pred;              //setting RWire for corresponding GHR updation in the rule
             w_pc<=pc;
 
