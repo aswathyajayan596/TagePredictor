@@ -51,34 +51,43 @@ package Tage_predictor;
 
         let bimodal_max = fromInteger(`BIMODALSIZE-1);   //maximum sixe for Regfile of Bimodal Predictor Table
         let table_max = fromInteger(`TABLESIZE-1);       //maximum size for RegFile of Predictor tables
+
         Reg#(GlobalHistory) ghr <- mkReg(0);            //internal register to store GHR
-        Reg#(PredictionPacket) pred_pkt <- mkReg(unpack(0));  //output - index, tag1 & 2, usefulbits,ctr, ghr,prediction, tableNo, altpred initialised to 0
-        RegFile#(BimodalIndex, BimodalEntry) bimodal <- mkRegFile(0, bimodal_max);
-        RegFile#(TagTableIndex, TagEntry) table_0 <- mkRegFile(0, table_max);
-        RegFile#(TagTableIndex, TagEntry) table_1 <- mkRegFile(0, table_max);
-        RegFile#(TagTableIndex, TagEntry) table_2 <- mkRegFile(0, table_max);
-        RegFile#(TagTableIndex, TagEntry) table_3 <- mkRegFile(0, table_max);
-        Reg#(PathHistory) phr <- mkReg(0);
-        RegFile#(TagTableIndex, TagEntry) tables[4] = {table_0, table_1, table_2, table_3};
-        Wire#(UpdationPacket) w_upd_pkt <- mkWire();
-        Wire#(Prediction)  w_pred <- mkWire();
-        Wire#(ProgramCounter) w_pc <- mkWire();
-        Wire#(GlobalHistory) w_ghr <- mkWire();
-        Wire#(PathHistory) w_phr <- mkWire();
+        Reg#(PathHistory) phr <- mkReg(0);              //internal register to store PHR
 
+        //RegFiles of Table Predictors in TAGE, one bimodal table predictor and four Tagged table predictors
+        RegFile#(BimodalIndex, BimodalEntry) bimodal <- mkRegFile(0, bimodal_max);   //bimodal table
+        RegFile#(TagTableIndex, TagEntry) table_0 <- mkRegFile(0, table_max);        //tagged table 0
+        RegFile#(TagTableIndex, TagEntry) table_1 <- mkRegFile(0, table_max);        //tagged table 1
+        RegFile#(TagTableIndex, TagEntry) table_2 <- mkRegFile(0, table_max);        //tagged table 2
+        RegFile#(TagTableIndex, TagEntry) table_3 <- mkRegFile(0, table_max);        //tagged table 3
         
-        Wire#(Bool) w_pred_over <- mkWire();
-        Wire#(Bool) w_update_over <- mkWire();
+        RegFile#(TagTableIndex, TagEntry) tagTables[4] = {table_0, table_1, table_2, table_3}; //array of Tagged table predictors  
+        
+        Reg#(PredictionPacket) pred_pkt <- mkReg(unpack(0));  //output register to store prediction packet
+        
+        //Wires to take in values between methods and rules.
+        Wire#(GlobalHistory) w_ghr <- mkWire();        //Wire for global history register
+        Wire#(PathHistory) w_phr <- mkWire();          //Wire for path history register
+        Wire#(ProgramCounter) w_pc <- mkWire();        //Wire for program counter
+        Wire#(Prediction)  w_pred <- mkWire();         //wire for prediction
+        Wire#(UpdationPacket) w_upd_pkt <- mkWire();   //wire for updation packet
 
-        rule rl_update(w_update_over == True);
+        Wire#(Bool) w_pred_over <- mkWire();           //Wire to indicate prediction is over
+        Wire#(Bool) w_update_over <- mkWire();         //Wire to indicate updation is over
+
+        //rule to update the GHR and PHR when actualoutcome is obtained.
+        rule rl_reconstruct_GHR_PHR(w_update_over == True);
             PathHistory t_phr = 0;
-            GlobalHistory t_ghr=0;
+            GlobalHistory t_ghr = 0;
             let t_upd_pkt = w_upd_pkt;
+            // Misprediction if occured, reconstruct GHR and PHR 
             if (t_upd_pkt.mispred == 1'b1) begin
                 t_upd_pkt.ghr = (t_upd_pkt.ghr >> 1);
                 t_ghr = update_GHR(t_upd_pkt.ghr, t_upd_pkt.actualOutcome);
                 t_phr = t_upd_pkt.phr;
             end
+
             w_pred_over <= True;
             w_ghr <= t_ghr;
             w_phr <= t_phr;
@@ -93,7 +102,7 @@ package Tage_predictor;
             `endif
         endrule
 
-        rule rl_spec_update (w_pred_over == True);
+        rule rl_spec_update_GHR_PHR (w_pred_over == True);
             w_ghr <= update_GHR(ghr, w_pred);
             w_phr <= update_PHR(phr, w_pc);
 
@@ -174,15 +183,15 @@ package Tage_predictor;
             Bool matched = False;
             Bool altMatched = False;
             for (Integer i = 3; i >= 0; i=i-1) begin
-                if(tables[i].sub(tagTable_index[i]).tag == computedTag[i] && !matched) begin
-                    t_pred_pkt.ctr[i+1] = tables[i].sub(tagTable_index[i]).ctr;
-                    t_pred_pkt.pred = tables[i].sub(tagTable_index[i]).ctr[2];
+                if(tagTables[i].sub(tagTable_index[i]).tag == computedTag[i] && !matched) begin
+                    t_pred_pkt.ctr[i+1] = tagTables[i].sub(tagTable_index[i]).ctr;
+                    t_pred_pkt.pred = tagTables[i].sub(tagTable_index[i]).ctr[2];
                     t_pred_pkt.tableNo = fromInteger(i+1); 
-                    t_pred_pkt.uCtr[i] = tables[i].sub(tagTable_index[i]).uCtr;        
+                    t_pred_pkt.uCtr[i] = tagTables[i].sub(tagTable_index[i]).uCtr;        
                     matched = True;
                 end
-                else if(tables[i].sub(tagTable_index[i]).tag == computedTag[i] && matched && !altMatched) begin
-                    t_pred_pkt.altpred = tables[i].sub(tagTable_index[i]).ctr[2];
+                else if(tagTables[i].sub(tagTable_index[i]).tag == computedTag[i] && matched && !altMatched) begin
+                    t_pred_pkt.altpred = tagTables[i].sub(tagTable_index[i]).ctr[2];
                     altMatched = True;
                 end
             end
@@ -224,7 +233,7 @@ package Tage_predictor;
             BimodalEntry t_bimodal = bimodal.sub(bindex);
             for(Integer i=0; i < 4; i=i+1) begin
                 ind[i] = upd_pkt.tagTable_index[i];
-                t_table[i] = tables[i].sub(ind[i]);
+                t_table[i] = tagTables[i].sub(ind[i]);
                 table_tags[i] = upd_pkt.tableTag[i];
             end
 
@@ -289,7 +298,7 @@ package Tage_predictor;
             //Assigning back the corresponding entries to the prediction tables.
             bimodal.upd(bindex,t_bimodal);
             for(Integer i = 0 ; i < 4; i = i+1)
-                tables[i].upd(ind[i], t_table[i]);
+                tagTables[i].upd(ind[i], t_table[i]);
 
             `ifdef DISPLAY
                 $display("Updation over\n");
