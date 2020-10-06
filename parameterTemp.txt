@@ -1,0 +1,31 @@
+//change this when the trace file is changed 1792835
+`define traceSize {traceSize}
+
+
+//uncomment below line if you want to see simulation display
+// `define  DISPLAY             1
+// `define  DEBUG               1
+
+//change the below parameters for analysis only
+`define     NUMTAGTABLES        4   
+`define     TABLESIZE           {tableSize}
+`define     BIMODALSIZE         {bimodalSize}
+`define     TAG1_SIZE           8
+`define     TAG2_SIZE           9
+`define     GHR1                {ghr1}
+`define     GHR2                {ghr2}
+`define     GHR3                {ghr3}
+`define     GHR4                {ghr4}
+`define     BIMODAL_LEN         {bimodalLen}
+`define     TABLE_LEN           {tableLen}
+`define     PHR_LEN             {phrLen}
+
+//change the below parameters only if needed, dependent on architecture of TAGE and the design
+`define     PC_LEN              64
+`define     BIMODAL_CTR_LEN     2
+`define     TAGTABLE_CTR_LEN    3
+`define     U_LEN               2
+`define     OUTCOME             1
+`define     PRED                1
+`define     GEOM_LEN            32
+`define     TARGET_LEN          32
